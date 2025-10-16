@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>System Accounting - Claims</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:900px;margin:30px auto;padding:0 16px;}
+    h1{font-size:20px;margin:0 0 16px}
+    .card{border:1px solid #eee;border-radius:10px;padding:16px;margin:12px 0;background:#fafafa}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;font-size:14px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef;color:#334}
+  </style>
+  <!-- Supabase JS CDN v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>📒 我的账单（演示版）</h1>
+  <div class="card">
+    <div id="status">正在从 Supabase 读取数据…</div>
+    <table id="tbl" style="display:none">
+      <thead>
+      <tr>
+        <th>ID</th>
+        <th>提交人</th>
+        <th>金额</th>
+        <th>用途</th>
+        <th>银行</th>
+        <th>账户</th>
+        <th>状态</th>
+        <th>创建时间</th>
+      </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // 1) 用你的 URL 和 anon key 替换下面两行
+    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
+
+    // 2) 初始化客户端
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 3) 读取 claims 表并渲染
+    async function loadClaims(){
+      const status = document.getElementById('status');
+      const table = document.getElementById('tbl');
+      const tbody = document.getElementById('rows');
+      status.textContent = "正在加载…";
+
+      const { data, error } = await supabase
+        .from('claims')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        status.textContent = "读取失败：" + error.message;
+        console.error(error);
+        return;
+      }
+
+      status.style.display = 'none';
+      table.style.display = '';
+
+      tbody.innerHTML = (data || []).map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td>${r.submitter_name || ''}</td>
+          <td>${Number(r.amount).toFixed(2)}</td>
+          <td>${r.purpose || ''}</td>
+          <td>${r.bank_name || ''}</td>
+          <td>${r.account_no || ''}</td>
+          <td><span class="badge">${r.status}</span></td>
+          <td>${new Date(r.created_at).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    loadClaims();
+  </script>
+</body>
+</html>
