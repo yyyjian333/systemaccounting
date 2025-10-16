@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <title>新增账单</title>
+  <title>新增账单（含收据上传）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:720px;margin:24px auto;padding:0 16px;}
@@ -20,9 +20,9 @@
 </head>
 <body>
   <div class="nav"><a href="/">← 返回列表</a></div>
-  <h1>📝 新增账单</h1>
+  <h1>📝 新增账单（可上传收据）</h1>
   <div class="card">
-    <div class="tip">带星号的是必填项。</div>
+    <div class="tip">带星号的是必填项。收据可先传一张，之后可以再补传。</div>
     <form id="f">
       <label>提交人姓名 *</label>
       <input id="name" required placeholder="例如：Alice" />
@@ -39,6 +39,9 @@
       <label>账户号 *</label>
       <input id="acct" required placeholder="例如：112-345-6789" />
 
+      <label>收据（图片或 PDF，≤ 10MB）</label>
+      <input id="receipt" type="file" accept="image/*,application/pdf" />
+
       <button id="btn" type="submit">提交账单</button>
       <div id="msg" class="tip"></div>
     </form>
@@ -54,6 +57,7 @@
     const form = document.getElementById('f');
     const btn = document.getElementById('btn');
     const msg = document.getElementById('msg');
+    const receiptInput = document.getElementById('receipt');
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -68,17 +72,57 @@
         status: '已提交'
       };
 
-      // 简单校验
       if (!payload.submitter_name || !payload.amount || !payload.purpose || !payload.bank_name || !payload.account_no) {
         msg.textContent = '请把带星号的内容填完整。';
         btn.disabled = false; return;
       }
 
-      const { error } = await supabase.from('claims').insert(payload);
-      if (error) {
-        console.error(error);
-        msg.textContent = '提交失败：' + error.message;
+      // 1) 写入 claims，拿到新ID
+      const { data: inserted, error: insErr } = await supabase
+        .from('claims')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if (insErr) {
+        console.error(insErr);
+        msg.textContent = '提交失败：' + insErr.message;
         btn.disabled = false; return;
+      }
+
+      const claimId = inserted.id;
+
+      // 2) 如果选择了收据文件，上传到 Storage，并在 attachments 表记录一条
+      const file = receiptInput.files && receiptInput.files[0];
+      if (file) {
+        if (file.size > 10 * 1024 * 1024) {
+          msg.textContent = '收据太大了（>10MB）。';
+          btn.disabled = false; return;
+        }
+        const path = `${claimId}/${Date.now()}-${file.name}`;
+
+        // 上传到 receipts bucket
+        const { error: upErr } = await supabase.storage.from('receipts').upload(path, file);
+        if (upErr) {
+          console.error(upErr);
+          msg.textContent = '收据上传失败：' + upErr.message;
+          btn.disabled = false; return;
+        }
+
+        // 取公开 URL
+        const { data: pub } = supabase.storage.from('receipts').getPublicUrl(path);
+        const fileUrl = pub.publicUrl;
+
+        // 写入 attachments 表
+        const { error: attErr } = await supabase
+          .from('attachments')
+          .insert({ claim_id: claimId, file_url: fileUrl, type: 'receipt' });
+
+        if (attErr) {
+          console.error(attErr);
+          msg.textContent = '附件记录失败：' + attErr.message;
+          btn.disabled = false; return;
+        }
       }
 
       msg.textContent = '提交成功！即将返回列表…';
