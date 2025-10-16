@@ -5,17 +5,30 @@
   <title>System Accounting - Claims</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:900px;margin:30px auto;padding:0 16px;}
+    :root{--card:#fafafa;--bd:#eee;--txt:#222;--muted:#666}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:1100px;margin:28px auto;padding:0 16px;color:var(--txt)}
     h1{font-size:20px;margin:0 0 16px}
-    .card{border:1px solid #eee;border-radius:10px;padding:16px;margin:12px 0;background:#fafafa}
+    .nav{margin-bottom:12px}
+    .nav a{margin-right:12px}
+    .card{border:1px solid var(--bd);border-radius:12px;padding:16px;background:var(--card)}
     table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;font-size:14px}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef;color:#334}
+    th,td{border-bottom:1px solid var(--bd);padding:10px 8px;text-align:left;font-size:14px;vertical-align:top}
+    th{font-weight:600}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef;color:#334;font-size:12px}
+    .muted{color:var(--muted)}
+    .thumbs{display:flex;gap:8px;flex-wrap:wrap}
+    .thumbs a{display:inline-block}
+    .thumbs img{height:48px;width:auto;border-radius:6px;border:1px solid var(--bd);object-fit:cover}
+    .empty{padding:24px;text-align:center;color:var(--muted)}
+    .pdf{display:inline-block;padding:4px 6px;border:1px solid var(--bd);border-radius:6px;text-decoration:none}
   </style>
-  <!-- Supabase JS CDN v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+  <div class="nav">
+    <a href="/submit.html">➕ 新增账单</a>
+  </div>
+
   <h1>📒 我的账单（演示版）</h1>
   <div class="card">
     <div id="status">正在从 Supabase 读取数据…</div>
@@ -30,30 +43,32 @@
         <th>账户</th>
         <th>状态</th>
         <th>创建时间</th>
+        <th>收据</th>
       </tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
+    <div id="empty" class="empty" style="display:none">目前还没有数据，点左上角「新增账单」试试～</div>
   </div>
 
   <script>
-    // 1) 用你的 URL 和 anon key 替换下面两行
     const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
-
-    // 2) 初始化客户端
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 3) 读取 claims 表并渲染
+    // 读取 claims，并把关联 attachments 一起取出
     async function loadClaims(){
       const status = document.getElementById('status');
-      const table = document.getElementById('tbl');
-      const tbody = document.getElementById('rows');
+      const table  = document.getElementById('tbl');
+      const tbody  = document.getElementById('rows');
+      const empty  = document.getElementById('empty');
+
       status.textContent = "正在加载…";
 
+      // 关键：嵌套选择 attachments(*) 依赖 claims.id -> attachments.claim_id 的外键
       const { data, error } = await supabase
         .from('claims')
-        .select('*')
+        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, attachments(* )')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -62,21 +77,54 @@
         return;
       }
 
-      status.style.display = 'none';
-      table.style.display = '';
+      if (!data || !data.length) {
+        status.style.display = 'none';
+        empty.style.display = '';
+        return;
+      }
 
-      tbody.innerHTML = (data || []).map(r => `
-        <tr>
-          <td>${r.id}</td>
-          <td>${r.submitter_name || ''}</td>
-          <td>${Number(r.amount).toFixed(2)}</td>
-          <td>${r.purpose || ''}</td>
-          <td>${r.bank_name || ''}</td>
-          <td>${r.account_no || ''}</td>
-          <td><span class="badge">${r.status}</span></td>
-          <td>${new Date(r.created_at).toLocaleString()}</td>
-        </tr>
-      `).join('');
+      status.style.display = 'none';
+      table.style.display  = '';
+
+      tbody.innerHTML = data.map(c => {
+        const atts = Array.isArray(c.attachments) ? c.attachments : [];
+        const cell = atts.length
+          ? `<div class="thumbs">
+               ${atts.slice(0,3).map(a => renderThumb(a.file_url)).join('')}
+               ${atts.length > 3 ? `<span class="muted">+${atts.length-3} 更多…</span>` : ''}
+             </div>`
+          : `<span class="muted">无</span>`;
+
+        return `
+          <tr>
+            <td>${c.id}</td>
+            <td>${escapeHtml(c.submitter_name || '')}</td>
+            <td>${Number(c.amount).toFixed(2)}</td>
+            <td>${escapeHtml(c.purpose || '')}</td>
+            <td>${escapeHtml(c.bank_name || '')}</td>
+            <td>${escapeHtml(c.account_no || '')}</td>
+            <td><span class="badge">${escapeHtml(c.status || '')}</span></td>
+            <td>${new Date(c.created_at).toLocaleString()}</td>
+            <td>${cell}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 根据链接类型渲染缩略图（图片显示缩略图，PDF 显示按钮）
+    function renderThumb(url){
+      const isPdf = /\.pdf(\?|$)/i.test(url);
+      if (isPdf) {
+        return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
+      }
+      return `<a href="${url}" target="_blank" rel="noopener">
+                <img src="${url}" alt="receipt" />
+              </a>`;
+    }
+
+    // 简单转义，避免异常字符破坏页面
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     }
 
     loadClaims();
