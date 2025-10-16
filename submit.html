@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <title>新增账单</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:720px;margin:24px auto;padding:0 16px;}
+    h1{font-size:20px;margin:0 0 16px}
+    .card{border:1px solid #eee;border-radius:10px;padding:16px;background:#fafafa}
+    label{display:block;margin:10px 0 6px}
+    input,textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+    button{margin-top:14px;padding:10px 14px;border:0;border-radius:8px;background:#111;color:#fff;font-size:14px;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .tip{margin:10px 0;color:#666}
+    .nav{margin-bottom:14px}
+    .nav a{margin-right:12px}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="nav"><a href="/">← 返回列表</a></div>
+  <h1>📝 新增账单</h1>
+  <div class="card">
+    <div class="tip">带星号的是必填项。</div>
+    <form id="f">
+      <label>提交人姓名 *</label>
+      <input id="name" required placeholder="例如：Alice" />
+
+      <label>金额（MYR） *</label>
+      <input id="amount" required type="number" step="0.01" min="0" placeholder="例如：120.50" />
+
+      <label>用途（买了啥/用在哪里） *</label>
+      <textarea id="purpose" required rows="2" placeholder="例如：买打印纸"></textarea>
+
+      <label>银行 *</label>
+      <input id="bank" required placeholder="例如：Maybank" />
+
+      <label>账户号 *</label>
+      <input id="acct" required placeholder="例如：112-345-6789" />
+
+      <button id="btn" type="submit">提交账单</button>
+      <div id="msg" class="tip"></div>
+    </form>
+  </div>
+
+  <script>
+    // 用你的 URL 和 anon key 替换下面两行
+    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const form = document.getElementById('f');
+    const btn = document.getElementById('btn');
+    const msg = document.getElementById('msg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true; msg.textContent = '提交中…';
+
+      const payload = {
+        submitter_name: document.getElementById('name').value.trim(),
+        amount: Number(document.getElementById('amount').value),
+        purpose: document.getElementById('purpose').value.trim(),
+        bank_name: document.getElementById('bank').value.trim(),
+        account_no: document.getElementById('acct').value.trim(),
+        status: '已提交'
+      };
+
+      // 简单校验
+      if (!payload.submitter_name || !payload.amount || !payload.purpose || !payload.bank_name || !payload.account_no) {
+        msg.textContent = '请把带星号的内容填完整。';
+        btn.disabled = false; return;
+      }
+
+      const { error } = await supabase.from('claims').insert(payload);
+      if (error) {
+        console.error(error);
+        msg.textContent = '提交失败：' + error.message;
+        btn.disabled = false; return;
+      }
+
+      msg.textContent = '提交成功！即将返回列表…';
+      setTimeout(() => { window.location.href = '/'; }, 800);
+    });
+  </script>
+</body>
+</html>
