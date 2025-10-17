@@ -55,6 +55,20 @@
     const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+      // 自动检测登录状态
+  async function checkLogin() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert("请先登录！");
+      window.location.href = "/login.html";
+      return null;
+    }
+    return session.user;
+  }
+
+  // 一进入页面就检查是否登录
+  checkLogin();
+
     const form = document.getElementById('f');
     const btn = document.getElementById('btn');
     const msg = document.getElementById('msg');
