@@ -7,20 +7,29 @@
   <style>
     :root{--card:#fafafa;--bd:#eee;--txt:#222;--muted:#666}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:1100px;margin:28px auto;padding:0 16px;color:var(--txt)}
-    h1{font-size:20px;margin:0 0 16px}
+    h1{font-size:20px;margin:0 0 12px}
     .nav{margin-bottom:12px}
     .nav a{margin-right:12px}
     .card{border:1px solid var(--bd);border-radius:12px;padding:16px;background:var(--card)}
     table{width:100%;border-collapse:collapse}
     th,td{border-bottom:1px solid var(--bd);padding:10px 8px;text-align:left;font-size:14px;vertical-align:top}
     th{font-weight:600}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef;color:#334;font-size:12px}
     .muted{color:var(--muted)}
     .thumbs{display:flex;gap:8px;flex-wrap:wrap}
-    .thumbs a{display:inline-block}
     .thumbs img{height:48px;width:auto;border-radius:6px;border:1px solid var(--bd);object-fit:cover}
     .empty{padding:24px;text-align:center;color:var(--muted)}
     .pdf{display:inline-block;padding:4px 6px;border:1px solid var(--bd);border-radius:6px;text-decoration:none}
+    /* 彩色状态徽章 */
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid transparent}
+    .badge.blue{background:#e8f1ff;color:#154b9a;border-color:#cddffb}         /* 已提交 */
+    .badge.yellow{background:#fff6db;color:#7a5b00;border-color:#ffecb0}       /* 审核中 */
+    .badge.green{background:#e9f8ee;color:#136c3a;border-color:#c1f0d3}        /* 已完成 */
+
+    /* 顶部筛选条 */
+    .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+    .filters input,.filters select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
+    .filters button{padding:8px 12px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
+    .filters .ghost{background:#f2f2f2;color:#333}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -29,8 +38,22 @@
     <a href="/submit.html">➕ 新增账单</a>
   </div>
 
-  <h1>📒 我的账单（演示版）</h1>
+  <h1>🏦 RM账单</h1>
+
   <div class="card">
+    <!-- 搜索 / 筛选 -->
+    <div class="filters">
+      <input id="kw" placeholder="搜索：姓名/用途/银行…" />
+      <select id="st">
+        <option value="">全部状态</option>
+        <option value="已提交">已提交</option>
+        <option value="审核中">审核中</option>
+        <option value="已完成">已完成</option>
+      </select>
+      <button id="btnSearch">搜索</button>
+      <button id="btnClear" class="ghost">清空</button>
+    </div>
+
     <div id="status">正在从 Supabase 读取数据…</div>
     <table id="tbl" style="display:none">
       <thead>
@@ -52,24 +75,38 @@
   </div>
 
   <script>
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
+    // 🔧 替换为你的项目配置
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 读取 claims，并把关联 attachments 一起取出
-    async function loadClaims(){
+    const statusClass = (s) => s === '已完成' ? 'green' : (s === '审核中' ? 'yellow' : 'blue');
+
+    async function loadClaims({ kw = '', st = '' } = {}){
       const status = document.getElementById('status');
       const table  = document.getElementById('tbl');
       const tbody  = document.getElementById('rows');
       const empty  = document.getElementById('empty');
 
       status.textContent = "正在加载…";
+      table.style.display = 'none';
+      empty.style.display = 'none';
 
-      // 关键：嵌套选择 attachments(*) 依赖 claims.id -> attachments.claim_id 的外键
-      const { data, error } = await supabase
+      // 基础查询：带 attachments（依赖 attachments.claim_id -> claims.id 外键）
+      let query = supabase
         .from('claims')
-        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, attachments(* )')
+        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, attachments(*)')
         .order('created_at', { ascending: false });
+
+      // 关键字：姓名/用途/银行 里任一匹配（不区分大小写）
+      if (kw) {
+        const esc = kw.replace(/,/g, ''); // 防止 or 语法逗号冲突
+        query = query.or(`submitter_name.ilike.%${esc}%,purpose.ilike.%${esc}%,bank_name.ilike.%${esc}%`);
+      }
+      // 状态筛选
+      if (st) query = query.eq('status', st);
+
+      const { data, error } = await query;
 
       if (error) {
         status.textContent = "读取失败：" + error.message;
@@ -88,7 +125,7 @@
 
       tbody.innerHTML = data.map(c => {
         const atts = Array.isArray(c.attachments) ? c.attachments : [];
-        const cell = atts.length
+        const thumbs = atts.length
           ? `<div class="thumbs">
                ${atts.slice(0,3).map(a => renderThumb(a.file_url)).join('')}
                ${atts.length > 3 ? `<span class="muted">+${atts.length-3} 更多…</span>` : ''}
@@ -98,35 +135,41 @@
         return `
           <tr>
             <td>${c.id}</td>
-            <td>${escapeHtml(c.submitter_name || '')}</td>
+            <td>${esc(c.submitter_name || '')}</td>
             <td>${Number(c.amount).toFixed(2)}</td>
-            <td>${escapeHtml(c.purpose || '')}</td>
-            <td>${escapeHtml(c.bank_name || '')}</td>
-            <td>${escapeHtml(c.account_no || '')}</td>
-            <td><span class="badge">${escapeHtml(c.status || '')}</span></td>
+            <td>${esc(c.purpose || '')}</td>
+            <td>${esc(c.bank_name || '')}</td>
+            <td>${esc(c.account_no || '')}</td>
+            <td><span class="badge ${statusClass(c.status || '')}">${esc(c.status || '')}</span></td>
             <td>${new Date(c.created_at).toLocaleString()}</td>
-            <td>${cell}</td>
+            <td>${thumbs}</td>
           </tr>
         `;
       }).join('');
     }
 
-    // 根据链接类型渲染缩略图（图片显示缩略图，PDF 显示按钮）
     function renderThumb(url){
       const isPdf = /\.pdf(\?|$)/i.test(url);
       if (isPdf) {
         return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
       }
-      return `<a href="${url}" target="_blank" rel="noopener">
-                <img src="${url}" alt="receipt" />
-              </a>`;
+      return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
     }
+    const esc = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-    // 简单转义，避免异常字符破坏页面
-    function escapeHtml(s){
-      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    }
+    // 绑定搜索按钮
+    document.getElementById('btnSearch').addEventListener('click', () => {
+      const kw = document.getElementById('kw').value.trim();
+      const st = document.getElementById('st').value;
+      loadClaims({ kw, st });
+    });
+    document.getElementById('btnClear').addEventListener('click', () => {
+      document.getElementById('kw').value = '';
+      document.getElementById('st').value = '';
+      loadClaims({});
+    });
 
+    // 初次加载
     loadClaims();
   </script>
 </body>
