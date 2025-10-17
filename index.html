@@ -19,23 +19,28 @@
     .thumbs img{height:48px;width:auto;border-radius:6px;border:1px solid var(--bd);object-fit:cover}
     .empty{padding:24px;text-align:center;color:var(--muted)}
     .pdf{display:inline-block;padding:4px 6px;border:1px solid var(--bd);border-radius:6px;text-decoration:none}
-    /* 彩色状态徽章 */
+
+    /* 状态颜色 */
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid transparent}
     .badge.blue{background:#e8f1ff;color:#154b9a;border-color:#cddffb}         /* 已提交 */
     .badge.yellow{background:#fff6db;color:#7a5b00;border-color:#ffecb0}       /* 审核中 */
     .badge.green{background:#e9f8ee;color:#136c3a;border-color:#c1f0d3}        /* 已完成 */
-    .badge.red{background:#ffeaea;color:#9a1414;border-color:#f5b6b6;}.btn.red{background:#dc2626;color:#fff;}.btn.red:hover{background:#b91c1c;}
+    .badge.red{background:#ffeaea;color:#9a1414;border-color:#f5b6b6}          /* 拒绝 */
 
     /* 顶部筛选条 */
     .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
     .filters input,.filters select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
     .filters button{padding:8px 12px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
     .filters .ghost{background:#f2f2f2;color:#333}
+
     /* 操作按钮 */
     .btn{padding:6px 10px;border:0;border-radius:8px;cursor:pointer;font-size:12px}
     .btn.gray{background:#f2f2f2}
     .btn.blue{background:#0ea5e9;color:#fff}
     .btn.green{background:#16a34a;color:#fff}
+    .btn.red{background:#dc2626;color:#fff}
+    .btn.red:hover{background:#b91c1c}
+
     .who{font-size:12px;color:#666;margin-left:8px}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -51,7 +56,6 @@
   <h1>🏦 RM账单</h1>
 
   <div class="card">
-    <!-- 搜索 / 筛选 -->
     <div class="filters">
       <input id="kw" placeholder="搜索：姓名/用途/银行…" />
       <select id="st">
@@ -59,6 +63,7 @@
         <option value="已提交">已提交</option>
         <option value="审核中">审核中</option>
         <option value="已完成">已完成</option>
+        <option value="拒绝">拒绝</option>
       </select>
       <button id="btnSearch">搜索</button>
       <button id="btnClear" class="ghost">清空</button>
@@ -67,176 +72,155 @@
     <div id="status">正在从 Supabase 读取数据…</div>
     <table id="tbl" style="display:none">
       <thead>
-      <tr>
-        <th>ID</th>
-        <th>提交人</th>
-        <th>金额</th>
-        <th>用途</th>
-        <th>银行</th>
-        <th>账户</th>
-        <th>状态</th>
-        <th>创建时间</th>
-        <th>收据</th>
-        <th id="thActions" style="display:none">操作</th>
-      </tr>
+        <tr>
+          <th>ID</th><th>提交人</th><th>金额</th><th>用途</th>
+          <th>银行</th><th>账户</th><th>状态</th><th>创建时间</th><th>收据</th>
+          <th id="thActions" style="display:none">操作</th>
+        </tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
     <div id="empty" class="empty" style="display:none">目前还没有数据，点左上角「新增账单」试试～</div>
   </div>
 
-  <script>
-    // 🔧 替换为你的项目配置
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script>
+const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 登录校验 & 读取角色
-    let isAdmin = false;
-    let currentUser = null;
+let isAdmin = false;
+let currentUser = null;
 
-    async function checkLoginAndRole() {
-      // 未登录 -> 跳转
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert("请先登录！");
-        window.location.href = "/login.html";
-        return;
-      }
-      currentUser = session.user;
-      document.getElementById('who').textContent = currentUser.email;
+async function checkLoginAndRole() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    alert("请先登录！");
+    window.location.href = "/login.html";
+    return;
+  }
+  currentUser = session.user;
+  document.getElementById('who').textContent = currentUser.email;
 
-      // 查 profiles.role
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('role, full_name')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', currentUser.id)
+    .maybeSingle();
 
-      isAdmin = prof?.role === 'admin';
-      if (isAdmin) document.getElementById('thActions').style.display = '';
-    }
+  isAdmin = prof?.role === 'admin';
+  if (isAdmin) document.getElementById('thActions').style.display = '';
+}
 
-    async function logout(){
-      await supabase.auth.signOut();
-      window.location.href = "/login.html";
-    }
+async function logout(){
+  await supabase.auth.signOut();
+  window.location.href = "/login.html";
+}
 
-    const statusClass = (s) => 
+const statusClass = (s) => 
   s === '已完成' ? 'green' :
   s === '审核中' ? 'yellow' :
   s === '拒绝' ? 'red' :
   'blue';
 
-    const esc = s => String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const esc = s => String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-    // 加载数据（两步查：claims + attachments）
-    async function loadClaims({ kw = '', st = '' } = {}){
-      const status = document.getElementById('status');
-      const table  = document.getElementById('tbl');
-      const tbody  = document.getElementById('rows');
-      const empty  = document.getElementById('empty');
+async function loadClaims({ kw = '', st = '' } = {}){
+  const status = document.getElementById('status');
+  const table  = document.getElementById('tbl');
+  const tbody  = document.getElementById('rows');
+  const empty  = document.getElementById('empty');
 
-      status.textContent = "正在加载…";
-      table.style.display = 'none';
-      empty.style.display = 'none';
+  status.textContent = "正在加载…";
+  table.style.display = 'none';
+  empty.style.display = 'none';
 
-      let q = supabase
-        .from('claims')
-        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, reviewed_at, completed_at')
-        .order('created_at', { ascending: false });
+  let q = supabase.from('claims')
+    .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at')
+    .order('created_at', { ascending: false });
 
-      if (kw) {
-        const k = kw.replace(/,/g,'');
-        q = q.or(`submitter_name.ilike.%${k}%,purpose.ilike.%${k}%,bank_name.ilike.%${k}%`);
+  if (kw) {
+    const k = kw.replace(/,/g,'');
+    q = q.or(`submitter_name.ilike.%${k}%,purpose.ilike.%${k}%,bank_name.ilike.%${k}%`);
+  }
+  if (st) q = q.eq('status', st);
+
+  const { data: claims, error: e1 } = await q;
+  if (e1) { status.textContent = "读取失败：" + e1.message; console.error(e1); return; }
+  if (!claims || !claims.length) { status.style.display = 'none'; empty.style.display = ''; return; }
+
+  const ids = claims.map(c => c.id);
+  const { data: atts } = await supabase.from('attachments')
+    .select('claim_id, file_url, type')
+    .in('claim_id', ids);
+
+  const map = new Map();
+  (atts||[]).forEach(a => { if (!map.has(a.claim_id)) map.set(a.claim_id, []); map.get(a.claim_id).push(a); });
+
+  status.style.display = 'none';
+  table.style.display  = '';
+
+  tbody.innerHTML = claims.map(c => {
+    const list = map.get(c.id) || [];
+    const thumbs = list.length
+      ? `<div class="thumbs">${list.slice(0,3).map(a=>renderThumb(a.file_url)).join('')}
+         ${list.length>3?`<span class="muted">+${list.length-3} 更多…</span>`:''}</div>`
+      : `<span class="muted">无</span>`;
+
+    let actions = '';
+    if (isAdmin) {
+      if (c.status === '已提交') {
+        actions = `<button class="btn blue" onclick="setStatus(${c.id}, '审核中')">设为审核中</button>`;
+      } else if (c.status === '审核中') {
+        actions = `<button class="btn green" onclick="setStatus(${c.id}, '已完成')">设为已完成</button>
+                   <button class="btn gray" style="margin-left:6px" onclick="setStatus(${c.id}, '已提交')">退回已提交</button>
+                   <button class="btn red" style="margin-left:6px" onclick="setStatus(${c.id}, '拒绝')">拒绝</button>`;
       }
-      if (st) q = q.eq('status', st);
-
-      const { data: claims, error: e1 } = await q;
-      if (e1) { status.textContent = "读取失败：" + e1.message; console.error(e1); return; }
-      if (!claims || !claims.length) { status.style.display = 'none'; empty.style.display = ''; return; }
-
-      const ids = claims.map(c => c.id);
-      const { data: atts, error: e2 } = await supabase
-        .from('attachments')
-        .select('claim_id, file_url, type')
-        .in('claim_id', ids);
-      if (e2) console.error(e2);
-
-      const map = new Map();
-      (atts||[]).forEach(a => { if (!map.has(a.claim_id)) map.set(a.claim_id, []); map.get(a.claim_id).push(a); });
-
-      status.style.display = 'none';
-      table.style.display  = '';
-
-      tbody.innerHTML = claims.map(c => {
-        const list = map.get(c.id) || [];
-        const thumbs = list.length
-          ? `<div class="thumbs">
-               ${list.slice(0,3).map(a => renderThumb(a.file_url)).join('')}
-               ${list.length > 3 ? `<span class="muted">+${list.length-3} 更多…</span>` : ''}
-             </div>`
-          : `<span class="muted">无</span>`;
-
-        // 管理员操作按钮
-        let actions = '';
-        if (isAdmin) {
-          if (c.status === '已提交') {
-            actions = `<button class="btn blue" onclick="setStatus(${c.id}, '审核中')">设为审核中</button>`;
-          } else if (c.status === '审核中') {
-            actions = `<button class="btn green" onclick="setStatus(${c.id}, '已完成')">设为已完成</button>
-                       <button class="btn gray" style="margin-left:6px" onclick="setStatus(${c.id}, '已提交')">退回已提交</button>`;
-          }
-        }
-
-        return `
-          <tr>
-            <td>${c.id}</td>
-            <td>${esc(c.submitter_name)}</td>
-            <td>${Number(c.amount).toFixed(2)}</td>
-            <td>${esc(c.purpose)}</td>
-            <td>${esc(c.bank_name)}</td>
-            <td>${esc(c.account_no)}</td>
-            <td><span class="badge ${statusClass(c.status)}">${esc(c.status)}</span></td>
-            <td>${new Date(c.created_at).toLocaleString()}</td>
-            <td>${thumbs}</td>
-            <td>${actions}</td>
-          </tr>`;
-      }).join('');
     }
 
-    function renderThumb(url){
-      const isPdf = /\.pdf(\?|$)/i.test(url);
-      if (isPdf) return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
-      return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
-    }
+    return `<tr>
+      <td>${c.id}</td>
+      <td>${esc(c.submitter_name)}</td>
+      <td>${Number(c.amount).toFixed(2)}</td>
+      <td>${esc(c.purpose)}</td>
+      <td>${esc(c.bank_name)}</td>
+      <td>${esc(c.account_no)}</td>
+      <td><span class="badge ${statusClass(c.status)}">${esc(c.status)}</span></td>
+      <td>${new Date(c.created_at).toLocaleString()}</td>
+      <td>${thumbs}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
 
-    // 审批：更新状态（只有 admin 有策略权限）
-    async function setStatus(id, next){
-      const payload = { status: next };
-      if (next === '审核中') payload.reviewed_at = new Date().toISOString();
-      if (next === '已完成')  payload.completed_at = new Date().toISOString();
+function renderThumb(url){
+  const isPdf = /\.pdf(\?|$)/i.test(url);
+  if (isPdf) return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
+  return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
+}
 
-      const { error } = await supabase.from('claims').update(payload).eq('id', id);
-      if (error) { alert('更新失败：' + error.message); console.error(error); return; }
-      loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
-    }
+async function setStatus(id, next){
+  const payload = { status: next };
+  if (next === '审核中') payload.reviewed_at = new Date().toISOString();
+  if (next === '已完成')  payload.completed_at = new Date().toISOString();
 
-    // 事件绑定
-    document.getElementById('btnSearch').addEventListener('click', () => {
-      loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
-    });
-    document.getElementById('btnClear').addEventListener('click', () => {
-      document.getElementById('kw').value = '';
-      document.getElementById('st').value = '';
-      loadClaims({});
-    });
+  const { error } = await supabase.from('claims').update(payload).eq('id', id);
+  if (error) { alert('更新失败：' + error.message); console.error(error); return; }
+  loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
+}
 
-    // 页面初始化
-    (async function init(){
-      await checkLoginAndRole();
-      await loadClaims();
-    })();
-  </script>
+document.getElementById('btnSearch').addEventListener('click', () => {
+  loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
+});
+document.getElementById('btnClear').addEventListener('click', () => {
+  document.getElementById('kw').value = '';
+  document.getElementById('st').value = '';
+  loadClaims({});
+});
+
+(async function init(){
+  await checkLoginAndRole();
+  await loadClaims();
+})();
+</script>
 </body>
 </html>
