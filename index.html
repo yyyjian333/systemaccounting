@@ -2,175 +2,244 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <title>System Accounting - Claims</title>
+  <title>Dashboard · 收支图表</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{--card:#fafafa;--bd:#eee;--txt:#222;--muted:#666}
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:1100px;margin:28px auto;padding:0 16px;color:var(--txt)}
-    h1{font-size:20px;margin:0 0 12px}
-    .nav{margin-bottom:12px}
+    h1{font-size:20px;margin:0 0 16px}
+    .nav{margin-bottom:16px}
     .nav a{margin-right:12px}
-    .card{border:1px solid var(--bd);border-radius:12px;padding:16px;background:var(--card)}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid var(--bd);padding:10px 8px;text-align:left;font-size:14px;vertical-align:top}
-    th{font-weight:600}
+    .card{border:1px solid var(--bd);border-radius:12px;background:var(--card);padding:16px;margin:12px 0}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .kpi{border:1px solid var(--bd);border-radius:12px;background:#fff;padding:14px}
+    .kpi h3{margin:0 0 4px;font-size:13px;color:var(--muted)}
+    .kpi div{font-size:22px;font-weight:700}
+    canvas{width:100%;height:340px;max-height:340px}
     .muted{color:var(--muted)}
-    .thumbs{display:flex;gap:8px;flex-wrap:wrap}
-    .thumbs img{height:48px;width:auto;border-radius:6px;border:1px solid var(--bd);object-fit:cover}
-    .empty{padding:24px;text-align:center;color:var(--muted)}
-    .pdf{display:inline-block;padding:4px 6px;border:1px solid var(--bd);border-radius:6px;text-decoration:none}
-    /* 彩色状态徽章 */
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid transparent}
-    .badge.blue{background:#e8f1ff;color:#154b9a;border-color:#cddffb}         /* 已提交 */
-    .badge.yellow{background:#fff6db;color:#7a5b00;border-color:#ffecb0}       /* 审核中 */
-    .badge.green{background:#e9f8ee;color:#136c3a;border-color:#c1f0d3}        /* 已完成 */
-
-    /* 顶部筛选条 */
-    .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
-    .filters input,.filters select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
-    .filters button{padding:8px 12px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
-    .filters .ghost{background:#f2f2f2;color:#333}
   </style>
+  <!-- Supabase + Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
   <div class="nav">
-    <a href="/submit.html">➕ 新增账单</a>
+    <a href="/">← 返回列表</a>
+  </div>
+  <h1>📊 收支总览</h1>
+
+  <!-- KPIs -->
+  <div class="grid">
+    <div class="kpi"><h3>本周 · 进账</h3><div id="wkIn">-</div></div>
+    <div class="kpi"><h3>本周 · 出账</h3><div id="wkOut">-</div></div>
+    <div class="kpi"><h3>本周 · 结余</h3><div id="wkNet">-</div></div>
+  </div>
+  <div class="grid">
+    <div class="kpi"><h3>本月 · 进账</h3><div id="moIn">-</div></div>
+    <div class="kpi"><h3>本月 · 出账</h3><div id="moOut">-</div></div>
+    <div class="kpi"><h3>本月 · 结余</h3><div id="moNet">-</div></div>
+  </div>
+  <div class="grid">
+    <div class="kpi"><h3>本年 · 进账</h3><div id="yrIn">-</div></div>
+    <div class="kpi"><h3>本年 · 出账</h3><div id="yrOut">-</div></div>
+    <div class="kpi"><h3>本年 · 结余</h3><div id="yrNet">-</div></div>
   </div>
 
-  <h1>🏦 RM账单</h1>
-
+  <!-- Charts -->
   <div class="card">
-    <!-- 搜索 / 筛选 -->
-    <div class="filters">
-      <input id="kw" placeholder="搜索：姓名/用途/银行…" />
-      <select id="st">
-        <option value="">全部状态</option>
-        <option value="已提交">已提交</option>
-        <option value="审核中">审核中</option>
-        <option value="已完成">已完成</option>
-      </select>
-      <button id="btnSearch">搜索</button>
-      <button id="btnClear" class="ghost">清空</button>
-    </div>
-
-    <div id="status">正在从 Supabase 读取数据…</div>
-    <table id="tbl" style="display:none">
-      <thead>
-      <tr>
-        <th>ID</th>
-        <th>提交人</th>
-        <th>金额</th>
-        <th>用途</th>
-        <th>银行</th>
-        <th>账户</th>
-        <th>状态</th>
-        <th>创建时间</th>
-        <th>收据</th>
-      </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div id="empty" class="empty" style="display:none">目前还没有数据，点左上角「新增账单」试试～</div>
+    <h3>近 12 周</h3>
+    <canvas id="chartWeek"></canvas>
+    <div class="muted">说明：进账来自 transactions[in]；出账来自 transactions[out] + claims(已完成)。</div>
+  </div>
+  <div class="card">
+    <h3>本年（按月）</h3>
+    <canvas id="chartMonth"></canvas>
+  </div>
+  <div class="card">
+    <h3>历年（按年）</h3>
+    <canvas id="chartYear"></canvas>
   </div>
 
   <script>
-    // 🔧 替换为你的项目配置
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
+    // 1) 替换为你的项目配置
+    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    const statusClass = (s) => s === '已完成' ? 'green' : (s === '审核中' ? 'yellow' : 'blue');
+    // 2) 工具函数
+    const sum = arr => arr.reduce((a,b)=>a+b,0);
+    const fmtMoney = n => 'RM ' + (Number(n||0)).toFixed(2);
+    const startOfWeek = d => { // 以周一为一周开始
+      const dt = new Date(d); const day = (dt.getDay()+6)%7; dt.setHours(0,0,0,0); dt.setDate(dt.getDate()-day); return dt;
+    };
+    const startOfMonth = d => { const dt = new Date(d); dt.setDate(1); dt.setHours(0,0,0,0); return dt; };
+    const startOfYear  = d => { const dt = new Date(d); dt.setMonth(0,1); dt.setHours(0,0,0,0); return dt; };
+    const ymd = d => { const dt = new Date(d); const m = String(dt.getMonth()+1).padStart(2,'0'); const day = String(dt.getDate()).padStart(2,'0'); return `${dt.getFullYear()}-${m}-${day}`; };
+    const ym  = d => { const dt = new Date(d); const m = String(dt.getMonth()+1).padStart(2,'0'); return `${dt.getFullYear()}-${m}`; };
 
-    async function loadClaims({ kw = '', st = '' } = {}){
-      const status = document.getElementById('status');
-      const table  = document.getElementById('tbl');
-      const tbody  = document.getElementById('rows');
-      const empty  = document.getElementById('empty');
+    // 3) 拉取数据：transactions (in/out) + claims(已完成=out)
+    async function fetchData(){
+      const now = new Date();
+      const since = new Date(now); since.setFullYear(now.getFullYear()-3); // 近三年
 
-      status.textContent = "正在加载…";
-      table.style.display = 'none';
-      empty.style.display = 'none';
+      // transactions（in/out）
+      const { data: tx, error: e1 } = await supabase
+        .from('transactions')
+        .select('kind, amount, occurred_at')
+        .gte('occurred_at', since.toISOString());
 
-      // 基础查询：带 attachments（依赖 attachments.claim_id -> claims.id 外键）
-      let query = supabase
+      if (e1) { console.error(e1); alert('读取 transactions 失败：'+e1.message); }
+
+      // claims（已完成 -> 视为 out）
+      const { data: claims, error: e2 } = await supabase
         .from('claims')
-        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, attachments(*)')
-        .order('created_at', { ascending: false });
+        .select('amount, status, created_at, completed_at')
+        .gte('created_at', since.toISOString());
 
-      // 关键字：姓名/用途/银行 里任一匹配（不区分大小写）
-      if (kw) {
-        const esc = kw.replace(/,/g, ''); // 防止 or 语法逗号冲突
-        query = query.or(`submitter_name.ilike.%${esc}%,purpose.ilike.%${esc}%,bank_name.ilike.%${esc}%`);
-      }
-      // 状态筛选
-      if (st) query = query.eq('status', st);
+      if (e2) { console.error(e2); alert('读取 claims 失败：'+e2.message); }
 
-      const { data, error } = await query;
+      const entries = [];
 
-      if (error) {
-        status.textContent = "读取失败：" + error.message;
-        console.error(error);
-        return;
-      }
+      // transactions -> entries
+      (tx||[]).forEach(t => {
+        if (!t || !t.kind) return;
+        const when = t.occurred_at || new Date().toISOString();
+        entries.push({ kind: t.kind, amount: Number(t.amount||0), date: when });
+      });
 
-      if (!data || !data.length) {
-        status.style.display = 'none';
-        empty.style.display = '';
-        return;
-      }
+      // claims.completed -> entries(out)
+      (claims||[]).forEach(c => {
+        if (c.status === '已完成') {
+          const when = c.completed_at || c.created_at;
+          entries.push({ kind: 'out', amount: Number(c.amount||0), date: when });
+        }
+      });
 
-      status.style.display = 'none';
-      table.style.display  = '';
-
-      tbody.innerHTML = data.map(c => {
-        const atts = Array.isArray(c.attachments) ? c.attachments : [];
-        const thumbs = atts.length
-          ? `<div class="thumbs">
-               ${atts.slice(0,3).map(a => renderThumb(a.file_url)).join('')}
-               ${atts.length > 3 ? `<span class="muted">+${atts.length-3} 更多…</span>` : ''}
-             </div>`
-          : `<span class="muted">无</span>`;
-
-        return `
-          <tr>
-            <td>${c.id}</td>
-            <td>${esc(c.submitter_name || '')}</td>
-            <td>${Number(c.amount).toFixed(2)}</td>
-            <td>${esc(c.purpose || '')}</td>
-            <td>${esc(c.bank_name || '')}</td>
-            <td>${esc(c.account_no || '')}</td>
-            <td><span class="badge ${statusClass(c.status || '')}">${esc(c.status || '')}</span></td>
-            <td>${new Date(c.created_at).toLocaleString()}</td>
-            <td>${thumbs}</td>
-          </tr>
-        `;
-      }).join('');
+      return entries;
     }
 
-    function renderThumb(url){
-      const isPdf = /\.pdf(\?|$)/i.test(url);
-      if (isPdf) {
-        return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
+    // 4) 按周 / 月 / 年汇总
+    function bucketWeek(entries){
+      // 生成近 12 周标签，从当前周往前
+      const arr = [];
+      const now = new Date(); let cur = startOfWeek(now);
+      for (let i=11;i>=0;i--){
+        const dt = new Date(cur); dt.setDate(cur.getDate() - i*7);
+        arr.push(dt);
       }
-      return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
+      const labels = arr.map(d => ymd(d)); // 周起始日
+      const inVals  = labels.map(()=>0);
+      const outVals = labels.map(()=>0);
+
+      entries.forEach(e=>{
+        const idx = labels.findIndex(label => {
+          const wk = startOfWeek(e.date);
+          return ymd(wk) === label;
+        });
+        if (idx>=0){
+          if (e.kind==='in')  inVals[idx]+=e.amount;
+          if (e.kind==='out') outVals[idx]+=e.amount;
+        }
+      });
+      return { labels, inVals, outVals };
     }
-    const esc = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-    // 绑定搜索按钮
-    document.getElementById('btnSearch').addEventListener('click', () => {
-      const kw = document.getElementById('kw').value.trim();
-      const st = document.getElementById('st').value;
-      loadClaims({ kw, st });
-    });
-    document.getElementById('btnClear').addEventListener('click', () => {
-      document.getElementById('kw').value = '';
-      document.getElementById('st').value = '';
-      loadClaims({});
-    });
+    function bucketMonth(entries){
+      // 本年 12 个月
+      const now = new Date();
+      const labels = [];
+      for (let m=0;m<12;m++){
+        const dt = new Date(now.getFullYear(), m, 1);
+        labels.push(ym(dt));
+      }
+      const inVals  = labels.map(()=>0);
+      const outVals = labels.map(()=>0);
+      entries.forEach(e=>{
+        const k = ym(e.date);
+        const idx = labels.indexOf(k);
+        if (idx>=0){
+          if (e.kind==='in')  inVals[idx]+=e.amount;
+          if (e.kind==='out') outVals[idx]+=e.amount;
+        }
+      });
+      return { labels, inVals, outVals };
+    }
 
-    // 初次加载
-    loadClaims();
+    function bucketYear(entries){
+      const map = new Map(); // year -> {in,out}
+      entries.forEach(e=>{
+        const y = new Date(e.date).getFullYear();
+        if (!map.has(y)) map.set(y, {in:0,out:0});
+        const obj = map.get(y);
+        if (e.kind==='in')  obj.in  += e.amount;
+        if (e.kind==='out') obj.out += e.amount;
+      });
+      const years = Array.from(map.keys()).sort((a,b)=>a-b);
+      const inVals  = years.map(y=>map.get(y).in);
+      const outVals = years.map(y=>map.get(y).out);
+      return { labels: years.map(String), inVals, outVals };
+    }
+
+    // 5) 画图 + 填 KPI
+    let chW, chM, chY;
+    function drawBar(ctx, labels, inVals, outVals){
+      return new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: '进账', data: inVals },
+            { label: '出账', data: outVals }
+          ]
+        },
+        options: { responsive:true, maintainAspectRatio:false }
+      });
+    }
+
+    function fillKPIs(entries){
+      const now = new Date();
+      const w0 = startOfWeek(now), m0 = startOfMonth(now), y0 = startOfYear(now);
+      const wk = entries.filter(e => startOfWeek(e.date).getTime() === w0.getTime());
+      const mo = entries.filter(e => startOfMonth(e.date).getTime() === m0.getTime());
+      const yr = entries.filter(e => startOfYear(e.date).getTime()  === y0.getTime());
+
+      const t = (list, kind) => sum(list.filter(e=>e.kind===kind).map(e=>e.amount));
+      const wkIn=t(wk,'in'),  wkOut=t(wk,'out');
+      const moIn=t(mo,'in'),  moOut=t(mo,'out');
+      const yrIn=t(yr,'in'),  yrOut=t(yr,'out');
+
+      document.getElementById('wkIn').textContent  = fmtMoney(wkIn);
+      document.getElementById('wkOut').textContent = fmtMoney(wkOut);
+      document.getElementById('wkNet').textContent = fmtMoney(wkIn - wkOut);
+
+      document.getElementById('moIn').textContent  = fmtMoney(moIn);
+      document.getElementById('moOut').textContent = fmtMoney(moOut);
+      document.getElementById('moNet').textContent = fmtMoney(moIn - moOut);
+
+      document.getElementById('yrIn').textContent  = fmtMoney(yrIn);
+      document.getElementById('yrOut').textContent = fmtMoney(yrOut);
+      document.getElementById('yrNet').textContent = fmtMoney(yrIn - yrOut);
+    }
+
+    // 6) 主流程
+    (async function main(){
+      const entries = await fetchData();
+
+      // KPI
+      fillKPIs(entries);
+
+      // Week
+      const w = bucketWeek(entries);
+      chW = drawBar(document.getElementById('chartWeek'), w.labels, w.inVals, w.outVals);
+
+      // Month
+      const m = bucketMonth(entries);
+      chM = drawBar(document.getElementById('chartMonth'), m.labels, m.inVals, m.outVals);
+
+      // Year
+      const y = bucketYear(entries);
+      chY = drawBar(document.getElementById('chartYear'), y.labels, y.inVals, y.outVals);
+    })();
   </script>
 </body>
 </html>
