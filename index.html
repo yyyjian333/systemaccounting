@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <title>System Accounting - Claims</title>
+  <title>RM账单</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{--card:#fafafa;--bd:#eee;--txt:#222;--muted:#666}
@@ -24,22 +24,29 @@
     .badge.blue{background:#e8f1ff;color:#154b9a;border-color:#cddffb}         /* 已提交 */
     .badge.yellow{background:#fff6db;color:#7a5b00;border-color:#ffecb0}       /* 审核中 */
     .badge.green{background:#e9f8ee;color:#136c3a;border-color:#c1f0d3}        /* 已完成 */
-
     /* 顶部筛选条 */
     .filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
     .filters input,.filters select{padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:14px}
     .filters button{padding:8px 12px;border:0;border-radius:8px;background:#111;color:#fff;cursor:pointer}
     .filters .ghost{background:#f2f2f2;color:#333}
+    /* 操作按钮 */
+    .btn{padding:6px 10px;border:0;border-radius:8px;cursor:pointer;font-size:12px}
+    .btn.gray{background:#f2f2f2}
+    .btn.blue{background:#0ea5e9;color:#fff}
+    .btn.green{background:#16a34a;color:#fff}
+    .who{font-size:12px;color:#666;margin-left:8px}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="nav">
-    <a href="/submit.html">🏦 提交报销</a>
+    <a href="/submit.html">➕ 新增账单</a>
     <a href="/dashboard.html">📊 Dashboard</a>
+    <a href="#" onclick="logout()">🚪 登出</a>
+    <span id="who" class="who"></span>
   </div>
 
-  <h1>🖥 RM账目</h1>
+  <h1>🏦 RM账单</h1>
 
   <div class="card">
     <!-- 搜索 / 筛选 -->
@@ -68,6 +75,7 @@
         <th>状态</th>
         <th>创建时间</th>
         <th>收据</th>
+        <th id="thActions" style="display:none">操作</th>
       </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -81,22 +89,41 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // 自动检测登录状态
-  async function checkLogin() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      alert("请先登录！");
-      window.location.href = "/login.html";
-      return null;
-    }
-    return session.user;
-  }
+    // 登录校验 & 读取角色
+    let isAdmin = false;
+    let currentUser = null;
 
-  // 一进入页面就检查是否登录
-  checkLogin();
+    async function checkLoginAndRole() {
+      // 未登录 -> 跳转
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert("请先登录！");
+        window.location.href = "/login.html";
+        return;
+      }
+      currentUser = session.user;
+      document.getElementById('who').textContent = currentUser.email;
+
+      // 查 profiles.role
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+
+      isAdmin = prof?.role === 'admin';
+      if (isAdmin) document.getElementById('thActions').style.display = '';
+    }
+
+    async function logout(){
+      await supabase.auth.signOut();
+      window.location.href = "/login.html";
+    }
 
     const statusClass = (s) => s === '已完成' ? 'green' : (s === '审核中' ? 'yellow' : 'blue');
+    const esc = s => String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
+    // 加载数据（两步查：claims + attachments）
     async function loadClaims({ kw = '', st = '' } = {}){
       const status = document.getElementById('status');
       const table  = document.getElementById('tbl');
@@ -107,76 +134,90 @@
       table.style.display = 'none';
       empty.style.display = 'none';
 
-      // 基础查询：带 attachments（依赖 attachments.claim_id -> claims.id 外键）
-      let query = supabase
+      let q = supabase
         .from('claims')
-        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, attachments(*)')
+        .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, reviewed_at, completed_at')
         .order('created_at', { ascending: false });
 
-      // 关键字：姓名/用途/银行 里任一匹配（不区分大小写）
       if (kw) {
-        const esc = kw.replace(/,/g, ''); // 防止 or 语法逗号冲突
-        query = query.or(`submitter_name.ilike.%${esc}%,purpose.ilike.%${esc}%,bank_name.ilike.%${esc}%`);
+        const k = kw.replace(/,/g,'');
+        q = q.or(`submitter_name.ilike.%${k}%,purpose.ilike.%${k}%,bank_name.ilike.%${k}%`);
       }
-      // 状态筛选
-      if (st) query = query.eq('status', st);
+      if (st) q = q.eq('status', st);
 
-      const { data, error } = await query;
+      const { data: claims, error: e1 } = await q;
+      if (e1) { status.textContent = "读取失败：" + e1.message; console.error(e1); return; }
+      if (!claims || !claims.length) { status.style.display = 'none'; empty.style.display = ''; return; }
 
-      if (error) {
-        status.textContent = "读取失败：" + error.message;
-        console.error(error);
-        return;
-      }
+      const ids = claims.map(c => c.id);
+      const { data: atts, error: e2 } = await supabase
+        .from('attachments')
+        .select('claim_id, file_url, type')
+        .in('claim_id', ids);
+      if (e2) console.error(e2);
 
-      if (!data || !data.length) {
-        status.style.display = 'none';
-        empty.style.display = '';
-        return;
-      }
+      const map = new Map();
+      (atts||[]).forEach(a => { if (!map.has(a.claim_id)) map.set(a.claim_id, []); map.get(a.claim_id).push(a); });
 
       status.style.display = 'none';
       table.style.display  = '';
 
-      tbody.innerHTML = data.map(c => {
-        const atts = Array.isArray(c.attachments) ? c.attachments : [];
-        const thumbs = atts.length
+      tbody.innerHTML = claims.map(c => {
+        const list = map.get(c.id) || [];
+        const thumbs = list.length
           ? `<div class="thumbs">
-               ${atts.slice(0,3).map(a => renderThumb(a.file_url)).join('')}
-               ${atts.length > 3 ? `<span class="muted">+${atts.length-3} 更多…</span>` : ''}
+               ${list.slice(0,3).map(a => renderThumb(a.file_url)).join('')}
+               ${list.length > 3 ? `<span class="muted">+${list.length-3} 更多…</span>` : ''}
              </div>`
           : `<span class="muted">无</span>`;
+
+        // 管理员操作按钮
+        let actions = '';
+        if (isAdmin) {
+          if (c.status === '已提交') {
+            actions = `<button class="btn blue" onclick="setStatus(${c.id}, '审核中')">设为审核中</button>`;
+          } else if (c.status === '审核中') {
+            actions = `<button class="btn green" onclick="setStatus(${c.id}, '已完成')">设为已完成</button>
+                       <button class="btn gray" style="margin-left:6px" onclick="setStatus(${c.id}, '已提交')">退回已提交</button>`;
+          }
+        }
 
         return `
           <tr>
             <td>${c.id}</td>
-            <td>${esc(c.submitter_name || '')}</td>
+            <td>${esc(c.submitter_name)}</td>
             <td>${Number(c.amount).toFixed(2)}</td>
-            <td>${esc(c.purpose || '')}</td>
-            <td>${esc(c.bank_name || '')}</td>
-            <td>${esc(c.account_no || '')}</td>
-            <td><span class="badge ${statusClass(c.status || '')}">${esc(c.status || '')}</span></td>
+            <td>${esc(c.purpose)}</td>
+            <td>${esc(c.bank_name)}</td>
+            <td>${esc(c.account_no)}</td>
+            <td><span class="badge ${statusClass(c.status)}">${esc(c.status)}</span></td>
             <td>${new Date(c.created_at).toLocaleString()}</td>
             <td>${thumbs}</td>
-          </tr>
-        `;
+            <td>${actions}</td>
+          </tr>`;
       }).join('');
     }
 
     function renderThumb(url){
       const isPdf = /\.pdf(\?|$)/i.test(url);
-      if (isPdf) {
-        return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
-      }
+      if (isPdf) return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
       return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
     }
-    const esc = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-    // 绑定搜索按钮
+    // 审批：更新状态（只有 admin 有策略权限）
+    async function setStatus(id, next){
+      const payload = { status: next };
+      if (next === '审核中') payload.reviewed_at = new Date().toISOString();
+      if (next === '已完成')  payload.completed_at = new Date().toISOString();
+
+      const { error } = await supabase.from('claims').update(payload).eq('id', id);
+      if (error) { alert('更新失败：' + error.message); console.error(error); return; }
+      loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
+    }
+
+    // 事件绑定
     document.getElementById('btnSearch').addEventListener('click', () => {
-      const kw = document.getElementById('kw').value.trim();
-      const st = document.getElementById('st').value;
-      loadClaims({ kw, st });
+      loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
     });
     document.getElementById('btnClear').addEventListener('click', () => {
       document.getElementById('kw').value = '';
@@ -184,8 +225,11 @@
       loadClaims({});
     });
 
-    // 初次加载
-    loadClaims();
+    // 页面初始化
+    (async function init(){
+      await checkLoginAndRole();
+      await loadClaims();
+    })();
   </script>
 </body>
 </html>
