@@ -2,7 +2,7 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <title>新增账单（含收据上传）</title>
+  <title>新增账单（可多张收据）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:720px;margin:24px auto;padding:0 16px;}
@@ -15,14 +15,15 @@
     .tip{margin:10px 0;color:#666}
     .nav{margin-bottom:14px}
     .nav a{margin-right:12px}
+    .progress{font-size:12px;color:#666}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="nav"><a href="/">← 返回列表</a></div>
-  <h1>📝 新增账单（可上传收据）</h1>
+  <h1>📝 新增账单（可多张收据）</h1>
   <div class="card">
-    <div class="tip">带星号的是必填项。收据可先传一张，之后可以再补传。</div>
+    <div class="tip">带星号的是必填项。收据可一次选择多张（图片或 PDF，单文件 ≤ 10MB）。</div>
     <form id="f">
       <label>提交人姓名 *</label>
       <input id="name" required placeholder="例如：Alice" />
@@ -39,29 +40,30 @@
       <label>账户号 *</label>
       <input id="acct" required placeholder="例如：112-345-6789" />
 
-      <label>收据（图片或 PDF，≤ 10MB）</label>
-      <input id="receipt" type="file" accept="image/*,application/pdf" />
+      <label>收据（图片或 PDF，可多选）</label>
+      <input id="receipts" type="file" accept="image/*,application/pdf" multiple />
 
       <button id="btn" type="submit">提交账单</button>
       <div id="msg" class="tip"></div>
+      <div id="prog" class="progress"></div>
     </form>
   </div>
 
   <script>
-    // 用你的 URL 和 anon key 替换下面两行
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
-
+    // 🔧 替换为你的项目配置
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const form = document.getElementById('f');
     const btn = document.getElementById('btn');
     const msg = document.getElementById('msg');
-    const receiptInput = document.getElementById('receipt');
+    const prog = document.getElementById('prog');
+    const filesInput = document.getElementById('receipts');
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      btn.disabled = true; msg.textContent = '提交中…';
+      btn.disabled = true; msg.textContent = '提交中…'; prog.textContent = '';
 
       const payload = {
         submitter_name: document.getElementById('name').value.trim(),
@@ -77,7 +79,7 @@
         btn.disabled = false; return;
       }
 
-      // 1) 写入 claims，拿到新ID
+      // 1) 插入 claims
       const { data: inserted, error: insErr } = await supabase
         .from('claims')
         .insert(payload)
@@ -89,44 +91,34 @@
         msg.textContent = '提交失败：' + insErr.message;
         btn.disabled = false; return;
       }
-
       const claimId = inserted.id;
 
-      // 2) 如果选择了收据文件，上传到 Storage，并在 attachments 表记录一条
-      const file = receiptInput.files && receiptInput.files[0];
-      if (file) {
-        if (file.size > 10 * 1024 * 1024) {
-          msg.textContent = '收据太大了（>10MB）。';
-          btn.disabled = false; return;
-        }
-        const path = `${claimId}/${Date.now()}-${file.name}`;
+      // 2) 多张收据逐个上传
+      const files = Array.from(filesInput.files || []);
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        if (f.size > 10 * 1024 * 1024) { msg.textContent = `第 ${i+1} 个文件超过 10MB，已跳过`; continue; }
 
-        // 上传到 receipts bucket
-        const { error: upErr } = await supabase.storage.from('receipts').upload(path, file);
-        if (upErr) {
-          console.error(upErr);
-          msg.textContent = '收据上传失败：' + upErr.message;
-          btn.disabled = false; return;
-        }
+        prog.textContent = `正在上传第 ${i+1}/${files.length} 张…`;
+        const path = `${claimId}/${Date.now()}-${i}-${f.name}`;
 
-        // 取公开 URL
+        // 上传到 receipts 桶
+        const { error: upErr } = await supabase.storage.from('receipts').upload(path, f);
+        if (upErr) { msg.textContent = '收据上传失败：' + upErr.message; btn.disabled = false; return; }
+
+        // 公开 URL & 写入 attachments
         const { data: pub } = supabase.storage.from('receipts').getPublicUrl(path);
         const fileUrl = pub.publicUrl;
 
-        // 写入 attachments 表
         const { error: attErr } = await supabase
           .from('attachments')
           .insert({ claim_id: claimId, file_url: fileUrl, type: 'receipt' });
 
-        if (attErr) {
-          console.error(attErr);
-          msg.textContent = '附件记录失败：' + attErr.message;
-          btn.disabled = false; return;
-        }
+        if (attErr) { msg.textContent = '附件记录失败：' + attErr.message; btn.disabled = false; return; }
       }
 
       msg.textContent = '提交成功！即将返回列表…';
-      setTimeout(() => { window.location.href = '/'; }, 800);
+      setTimeout(() => { window.location.href = '/'; }, 600);
     });
   </script>
 </body>
