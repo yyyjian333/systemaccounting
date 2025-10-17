@@ -2,33 +2,37 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <title>Dashboard · RM</title>
+  <title>新增账单 · RM</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     :root{
       --bg:#fbf7ee; --surface:#fff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
       --primary:#d4a016; --primary-600:#b4840e; --primary-100:#fff4d1;
-      --info:#1f5fa3; --info-600:#164a80; --success:#16a34a;
-      --radius:12px; --shadow:0 6px 18px rgba(0,0,0,.06);
+      --info:#1f5fa3; --info-600:#164a80; --info-100:#e8f2ff;
+      --success:#16a34a; --danger:#dc2626;
+      --radius:12px; --radius-sm:10px; --shadow:0 6px 18px rgba(0,0,0,.06); --shadow-sm:0 3px 10px rgba(0,0,0,.05);
     }
-    body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft Yahei","Noto Sans CJK SC",sans-serif;max-width:1100px;margin:28px auto;padding:0 16px}
-    h1{font-size:22px;margin:0 0 12px;font-weight:700}
+    body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft Yahei","Noto Sans CJK SC",sans-serif;max-width:880px;margin:28px auto;padding:0 16px}
+    h1{font-size:22px;margin:0 0 14px;font-weight:700}
     .nav{margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap}
-    .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.05)}
-    .btn-info{background:#1f5fa3;color:#fff}.btn-info:hover{background:#164a80}
+    .btn{border:0;border-radius:var(--radius-sm);padding:9px 14px;font-size:14px;cursor:pointer;transition:transform .08s,box-shadow .2s;box-shadow:var(--shadow-sm)}
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-600)}
+    .btn-info{background:var(--info);color:#fff}.btn-info:hover{background:var(--info-600)}
     .btn-ghost{background:#f3f4f6;color:#111}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+    label{font-size:13px;color:#374151;margin-bottom:6px;display:block}
+    input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;outline:none}
+    input:focus,textarea:focus,select:focus{box-shadow:0 0 0 4px rgba(212,160,22,.12)}
+    .muted{color:var(--muted)}
     .who{font-size:12px;color:var(--muted);margin-left:8px}
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:6px}
-    .kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px}
-    .kpi h3{font-size:13px;color:#6b7280;margin:0 0 4px}
-    .kpi div{font-size:22px;font-weight:700}
-    canvas{width:100%;height:340px;max-height:340px}
-    .muted{color:#6b7280}
+    .hint{font-size:12px;color:var(--muted)}
+    .ok{color:var(--success)} .err{color:var(--danger)}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
   <div class="nav">
@@ -37,102 +41,103 @@
     <span id="who" class="who"></span>
   </div>
 
-  <h1>📊 收支总览</h1>
-
-  <div class="grid">
-    <div class="kpi"><h3>本周 · 进账</h3><div id="wkIn">-</div></div>
-    <div class="kpi"><h3>本周 · 出账</h3><div id="wkOut">-</div></div>
-    <div class="kpi"><h3>本周 · 结余</h3><div id="wkNet">-</div></div>
-  </div>
-  <div class="grid">
-    <div class="kpi"><h3>本月 · 进账</h3><div id="moIn">-</div></div>
-    <div class="kpi"><h3>本月 · 出账</h3><div id="moOut">-</div></div>
-    <div class="kpi"><h3>本月 · 结余</h3><div id="moNet">-</div></div>
-  </div>
-  <div class="grid">
-    <div class="kpi"><h3>本年 · 进账</h3><div id="yrIn">-</div></div>
-    <div class="kpi"><h3>本年 · 出账</h3><div id="yrOut">-</div></div>
-    <div class="kpi"><h3>本年 · 结余</h3><div id="yrNet">-</div></div>
-  </div>
+  <h1>🧾 新增账单（可多张收据）</h1>
 
   <div class="card">
-    <h3>近 12 周</h3>
-    <canvas id="chartWeek"></canvas>
-    <div class="muted">说明：进账来自 transactions[in]；出账来自 transactions[out] + claims(已完成)。</div>
-  </div>
-  <div class="card">
-    <h3>本年（按月）</h3>
-    <canvas id="chartMonth"></canvas>
-  </div>
-  <div class="card">
-    <h3>历年（按年）</h3>
-    <canvas id="chartYear"></canvas>
+    <div class="row">
+      <div>
+        <label>提交人姓名 *</label>
+        <input id="name" placeholder="例如：王小明" required />
+      </div>
+      <div>
+        <label>金额（MYR） *</label>
+        <input id="amount" type="number" step="0.01" placeholder="例如：120.00" required />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>用途（买了啥/用在哪里） *</label>
+        <textarea id="purpose" rows="3" placeholder="简单描述…"></textarea>
+      </div>
+      <div>
+        <label>银行 *</label>
+        <input id="bank" placeholder="MAYBANK / CIMB…" />
+        <div class="hint">可手填银行名</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>账户号 *</label>
+        <input id="account" placeholder="例如：112-345-6789" />
+      </div>
+      <div>
+        <label>收据（可多选，PDF 或 图片，≤10MB/文件）</label>
+        <input id="files" type="file" multiple accept="image/*,.pdf" />
+      </div>
+    </div>
+
+    <div style="margin-top:14px;display:flex;gap:10px">
+      <button class="btn btn-primary" onclick="submitClaim()">提交账单</button>
+      <span id="msg" class="muted"></span>
+    </div>
   </div>
 
 <script>
-const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
+const SUPABASE_URL = "YOUR_SUPABASE_URL";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const sum = arr => arr.reduce((a,b)=>a+b,0);
-const fmt = n => 'RM ' + (Number(n||0)).toFixed(2);
-const startOfWeek=d=>{const t=new Date(d),k=(t.getDay()+6)%7;t.setHours(0,0,0,0);t.setDate(t.getDate()-k);return t;}
-const startOfMonth=d=>{const t=new Date(d);t.setDate(1);t.setHours(0,0,0,0);return t;}
-const startOfYear=d=>{const t=new Date(d);t.setMonth(0,1);t.setHours(0,0,0,0);return t;}
-const ymd=d=>{const t=new Date(d);const m=String(t.getMonth()+1).padStart(2,'0');const dd=String(t.getDate()).padStart(2,'0');return `${t.getFullYear()}-${m}-${dd}`;}
-const ym=d=>{const t=new Date(d);const m=String(t.getMonth()+1).padStart(2,'0');return `${t.getFullYear()}-${m}`;}
+async function checkLogin(){
+  const { data:{ session } } = await supabase.auth.getSession();
+  if(!session){ alert("请先登录"); location.href="/login.html"; return; }
+  document.getElementById('who').textContent = session.user.email;
+}
+async function logout(){ await supabase.auth.signOut(); location.href="/login.html"; }
 
-async function checkLogin(){ const {data:{session}}=await supabase.auth.getSession(); if(!session){alert('请先登录');location.href='/login.html';return;} document.getElementById('who').textContent=session.user.email; }
-async function logout(){ await supabase.auth.signOut(); location.href='/login.html'; }
+function setMsg(text, ok=false){ const el=document.getElementById('msg'); el.textContent=text; el.className= ok ? 'ok' : 'err'; if(!text){ el.className='muted'; } }
 
-async function fetchEntries(){
-  const now=new Date(); const since=new Date(now); since.setFullYear(now.getFullYear()-3);
-  const {data:tx}=await supabase.from('transactions').select('kind,amount,occurred_at').gte('occurred_at',since.toISOString());
-  const {data:claims}=await supabase.from('claims').select('amount,status,created_at,completed_at').gte('created_at',since.toISOString());
+async function submitClaim(){
+  setMsg("正在提交…", true);
+  const submitter_name = document.getElementById('name').value.trim();
+  const amount = parseFloat(document.getElementById('amount').value);
+  const purpose = document.getElementById('purpose').value.trim();
+  const bank_name = document.getElementById('bank').value.trim();
+  const account_no = document.getElementById('account').value.trim();
+  const files = document.getElementById('files').files;
 
-  const entries=[];
-  (tx||[]).forEach(t=>{if(!t||!t.kind)return;entries.push({kind:t.kind,amount:Number(t.amount||0),date:t.occurred_at||new Date().toISOString()});});
-  (claims||[]).forEach(c=>{if(c.status==='已完成'){entries.push({kind:'out',amount:Number(c.amount||0),date:c.completed_at||c.created_at});}});
-  return entries;
+  if(!submitter_name || !amount || !purpose || !bank_name || !account_no){
+    setMsg("请把必填信息填完整"); return;
+  }
+
+  // 1) 新建账单（状态：已提交）
+  const { data: claim, error: e1 } = await supabase
+    .from('claims')
+    .insert({ submitter_name, amount, purpose, bank_name, account_no, status:'已提交' })
+    .select('id')
+    .single();
+
+  if(e1){ setMsg("创建账单失败："+e1.message); console.error(e1); return; }
+
+  // 2) 上传多张收据 + 写入 attachments
+  if(files && files.length){
+    for(const f of files){
+      const path = `receipts/${claim.id}/${Date.now()}_${encodeURIComponent(f.name)}`;
+      const { error: eUp } = await supabase.storage.from('receipts').upload(path, f, { upsert:false });
+      if(eUp){ setMsg("上传失败："+eUp.message); console.error(eUp); return; }
+
+      const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(path);
+      const { error: eAtt } = await supabase.from('attachments').insert({ claim_id: claim.id, file_url: publicUrl, type:'receipt' });
+      if(eAtt){ setMsg("保存收据记录失败："+eAtt.message); console.error(eAtt); return; }
+    }
+  }
+
+  setMsg("提交成功！即将返回列表…", true);
+  setTimeout(()=> location.href="/index.html", 800);
 }
 
-function bucketWeek(entries){
-  const arr=[]; const cur=startOfWeek(new Date()); for(let i=11;i>=0;i--){const dt=new Date(cur); dt.setDate(cur.getDate()-i*7); arr.push(dt);}
-  const labels=arr.map(ymd); const IN=labels.map(()=>0), OUT=labels.map(()=>0);
-  entries.forEach(e=>{const idx=labels.findIndex(l=>ymd(startOfWeek(e.date))===l); if(idx>=0){ if(e.kind==='in')IN[idx]+=e.amount; if(e.kind==='out')OUT[idx]+=e.amount; }});
-  return{labels,inVals:IN,outVals:OUT};
-}
-function bucketMonth(entries){
-  const now=new Date(); const labels=[]; for(let m=0;m<12;m++){labels.push(ym(new Date(now.getFullYear(),m,1)));}
-  const IN=labels.map(()=>0), OUT=labels.map(()=>0);
-  entries.forEach(e=>{const k=ym(e.date); const i=labels.indexOf(k); if(i>=0){ if(e.kind==='in')IN[i]+=e.amount; if(e.kind==='out')OUT[i]+=e.amount; }});
-  return{labels,inVals:IN,outVals:OUT};
-}
-function bucketYear(entries){
-  const mp=new Map(); entries.forEach(e=>{const y=new Date(e.date).getFullYear(); if(!mp.has(y)) mp.set(y,{in:0,out:0}); const o=mp.get(y); if(e.kind==='in')o.in+=e.amount; else if(e.kind==='out')o.out+=e.amount; });
-  const ys=Array.from(mp.keys()).sort((a,b)=>a-b); return{labels:ys.map(String),inVals:ys.map(y=>mp.get(y).in),outVals:ys.map(y=>mp.get(y).out)};
-}
-function draw(id,labels,a,b){return new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{label:'进账',data:a},{label:'出账',data:b}]},options:{responsive:true,maintainAspectRatio:false}});}
-
-function fillKPI(entries){
-  const now=new Date(); const w0=startOfWeek(now), m0=startOfMonth(now), y0=startOfYear(now);
-  const fil=(list,kind)=>sum(list.filter(e=>e.kind===kind).map(e=>e.amount));
-  const W=entries.filter(e=>startOfWeek(e.date).getTime()===w0.getTime());
-  const M=entries.filter(e=>startOfMonth(e.date).getTime()===m0.getTime());
-  const Y=entries.filter(e=>startOfYear(e.date).getTime()===y0.getTime());
-  const wkIn=fil(W,'in'),wkOut=fil(W,'out'); document.getElementById('wkIn').textContent=fmt(wkIn); document.getElementById('wkOut').textContent=fmt(wkOut); document.getElementById('wkNet').textContent=fmt(wkIn-wkOut);
-  const moIn=fil(M,'in'),moOut=fil(M,'out'); document.getElementById('moIn').textContent=fmt(moIn); document.getElementById('moOut').textContent=fmt(moOut); document.getElementById('moNet').textContent=fmt(moIn-moOut);
-  const yrIn=fil(Y,'in'),yrOut=fil(Y,'out'); document.getElementById('yrIn').textContent=fmt(yrIn); document.getElementById('yrOut').textContent=fmt(yrOut); document.getElementById('yrNet').textContent=fmt(yrIn-yrOut);
-}
-
-(async function(){
-  await checkLogin();
-  const entries=await fetchEntries();
-  fillKPI(entries);
-  const w=bucketWeek(entries); draw('chartWeek', w.labels, w.inVals, w.outVals);
-  const m=bucketMonth(entries); draw('chartMonth', m.labels, m.inVals, m.outVals);
-  const y=bucketYear(entries); draw('chartYear', y.labels, y.inVals, y.outVals);
-})();
+(async function(){ await checkLogin(); })();
 </script>
 </body>
 </html>
