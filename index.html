@@ -120,7 +120,12 @@
       window.location.href = "/login.html";
     }
 
-    const statusClass = (s) => s === '已完成' ? 'green' : (s === '审核中' ? 'yellow' : 'blue');
+    const statusClass = (s) => 
+  s === '已完成' ? 'green' :
+  s === '审核中' ? 'yellow' :
+  s === '拒绝' ? 'red' :
+  'blue';
+
     const esc = s => String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
     // 加载数据（两步查：claims + attachments）
