@@ -2,33 +2,43 @@
 <html lang="zh">
 <head>
   <meta charset="utf-8" />
-  <title>Dashboard · 收支图表</title>
+  <title>Dashboard · RM</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    :root{--card:#fafafa;--bd:#eee;--txt:#222;--muted:#666}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;max-width:1100px;margin:28px auto;padding:0 16px;color:var(--txt)}
-    h1{font-size:20px;margin:0 0 16px}
-    .nav{margin-bottom:16px}
-    .nav a{margin-right:12px}
-    .card{border:1px solid var(--bd);border-radius:12px;background:var(--card);padding:16px;margin:12px 0}
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-    .kpi{border:1px solid var(--bd);border-radius:12px;background:#fff;padding:14px}
-    .kpi h3{margin:0 0 4px;font-size:13px;color:var(--muted)}
+    :root{
+      --bg:#fbf7ee; --surface:#fff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+      --primary:#d4a016; --primary-600:#b4840e; --primary-100:#fff4d1;
+      --info:#1f5fa3; --info-600:#164a80; --success:#16a34a;
+      --radius:12px; --shadow:0 6px 18px rgba(0,0,0,.06);
+    }
+    body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft Yahei","Noto Sans CJK SC",sans-serif;max-width:1100px;margin:28px auto;padding:0 16px}
+    h1{font-size:22px;margin:0 0 12px;font-weight:700}
+    .nav{margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap}
+    .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.05)}
+    .btn-info{background:#1f5fa3;color:#fff}.btn-info:hover{background:#164a80}
+    .btn-ghost{background:#f3f4f6;color:#111}
+    .who{font-size:12px;color:var(--muted);margin-left:8px}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:6px}
+    .kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px}
+    .kpi h3{font-size:13px;color:#6b7280;margin:0 0 4px}
     .kpi div{font-size:22px;font-weight:700}
     canvas{width:100%;height:340px;max-height:340px}
-    .muted{color:var(--muted)}
+    .muted{color:#6b7280}
   </style>
-  <!-- Supabase + Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 </head>
 <body>
   <div class="nav">
-    <a href="/">← 返回列表</a>
+    <a class="btn btn-info" href="/index.html">← 返回列表</a>
+    <a class="btn btn-ghost" href="#" onclick="logout()">🚪 登出</a>
+    <span id="who" class="who"></span>
   </div>
+
   <h1>📊 收支总览</h1>
 
-  <!-- KPIs -->
   <div class="grid">
     <div class="kpi"><h3>本周 · 进账</h3><div id="wkIn">-</div></div>
     <div class="kpi"><h3>本周 · 出账</h3><div id="wkOut">-</div></div>
@@ -45,7 +55,6 @@
     <div class="kpi"><h3>本年 · 结余</h3><div id="yrNet">-</div></div>
   </div>
 
-  <!-- Charts -->
   <div class="card">
     <h3>近 12 周</h3>
     <canvas id="chartWeek"></canvas>
@@ -60,201 +69,70 @@
     <canvas id="chartYear"></canvas>
   </div>
 
-  <script>
-    // 1) 替换为你的项目配置
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";           // 例如：https://jdzytjocdkuzjtuwygdl.supabase.co
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw"; // 你的 anon key
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script>
+const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      // 自动检测登录状态
-  async function checkLogin() {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      alert("请先登录！");
-      window.location.href = "/login.html";
-      return null;
-    }
-    return session.user;
-  }
+const sum = arr => arr.reduce((a,b)=>a+b,0);
+const fmt = n => 'RM ' + (Number(n||0)).toFixed(2);
+const startOfWeek=d=>{const t=new Date(d),k=(t.getDay()+6)%7;t.setHours(0,0,0,0);t.setDate(t.getDate()-k);return t;}
+const startOfMonth=d=>{const t=new Date(d);t.setDate(1);t.setHours(0,0,0,0);return t;}
+const startOfYear=d=>{const t=new Date(d);t.setMonth(0,1);t.setHours(0,0,0,0);return t;}
+const ymd=d=>{const t=new Date(d);const m=String(t.getMonth()+1).padStart(2,'0');const dd=String(t.getDate()).padStart(2,'0');return `${t.getFullYear()}-${m}-${dd}`;}
+const ym=d=>{const t=new Date(d);const m=String(t.getMonth()+1).padStart(2,'0');return `${t.getFullYear()}-${m}`;}
 
-  // 一进入页面就检查是否登录
-  checkLogin();
+async function checkLogin(){ const {data:{session}}=await supabase.auth.getSession(); if(!session){alert('请先登录');location.href='/login.html';return;} document.getElementById('who').textContent=session.user.email; }
+async function logout(){ await supabase.auth.signOut(); location.href='/login.html'; }
 
+async function fetchEntries(){
+  const now=new Date(); const since=new Date(now); since.setFullYear(now.getFullYear()-3);
+  const {data:tx}=await supabase.from('transactions').select('kind,amount,occurred_at').gte('occurred_at',since.toISOString());
+  const {data:claims}=await supabase.from('claims').select('amount,status,created_at,completed_at').gte('created_at',since.toISOString());
 
-    // 2) 工具函数
-    const sum = arr => arr.reduce((a,b)=>a+b,0);
-    const fmtMoney = n => 'RM ' + (Number(n||0)).toFixed(2);
-    const startOfWeek = d => { // 以周一为一周开始
-      const dt = new Date(d); const day = (dt.getDay()+6)%7; dt.setHours(0,0,0,0); dt.setDate(dt.getDate()-day); return dt;
-    };
-    const startOfMonth = d => { const dt = new Date(d); dt.setDate(1); dt.setHours(0,0,0,0); return dt; };
-    const startOfYear  = d => { const dt = new Date(d); dt.setMonth(0,1); dt.setHours(0,0,0,0); return dt; };
-    const ymd = d => { const dt = new Date(d); const m = String(dt.getMonth()+1).padStart(2,'0'); const day = String(dt.getDate()).padStart(2,'0'); return `${dt.getFullYear()}-${m}-${day}`; };
-    const ym  = d => { const dt = new Date(d); const m = String(dt.getMonth()+1).padStart(2,'0'); return `${dt.getFullYear()}-${m}`; };
+  const entries=[];
+  (tx||[]).forEach(t=>{if(!t||!t.kind)return;entries.push({kind:t.kind,amount:Number(t.amount||0),date:t.occurred_at||new Date().toISOString()});});
+  (claims||[]).forEach(c=>{if(c.status==='已完成'){entries.push({kind:'out',amount:Number(c.amount||0),date:c.completed_at||c.created_at});}});
+  return entries;
+}
 
-    // 3) 拉取数据：transactions (in/out) + claims(已完成=out)
-    async function fetchData(){
-      const now = new Date();
-      const since = new Date(now); since.setFullYear(now.getFullYear()-3); // 近三年
+function bucketWeek(entries){
+  const arr=[]; const cur=startOfWeek(new Date()); for(let i=11;i>=0;i--){const dt=new Date(cur); dt.setDate(cur.getDate()-i*7); arr.push(dt);}
+  const labels=arr.map(ymd); const IN=labels.map(()=>0), OUT=labels.map(()=>0);
+  entries.forEach(e=>{const idx=labels.findIndex(l=>ymd(startOfWeek(e.date))===l); if(idx>=0){ if(e.kind==='in')IN[idx]+=e.amount; if(e.kind==='out')OUT[idx]+=e.amount; }});
+  return{labels,inVals:IN,outVals:OUT};
+}
+function bucketMonth(entries){
+  const now=new Date(); const labels=[]; for(let m=0;m<12;m++){labels.push(ym(new Date(now.getFullYear(),m,1)));}
+  const IN=labels.map(()=>0), OUT=labels.map(()=>0);
+  entries.forEach(e=>{const k=ym(e.date); const i=labels.indexOf(k); if(i>=0){ if(e.kind==='in')IN[i]+=e.amount; if(e.kind==='out')OUT[i]+=e.amount; }});
+  return{labels,inVals:IN,outVals:OUT};
+}
+function bucketYear(entries){
+  const mp=new Map(); entries.forEach(e=>{const y=new Date(e.date).getFullYear(); if(!mp.has(y)) mp.set(y,{in:0,out:0}); const o=mp.get(y); if(e.kind==='in')o.in+=e.amount; else if(e.kind==='out')o.out+=e.amount; });
+  const ys=Array.from(mp.keys()).sort((a,b)=>a-b); return{labels:ys.map(String),inVals:ys.map(y=>mp.get(y).in),outVals:ys.map(y=>mp.get(y).out)};
+}
+function draw(id,labels,a,b){return new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{label:'进账',data:a},{label:'出账',data:b}]},options:{responsive:true,maintainAspectRatio:false}});}
 
-      // transactions（in/out）
-      const { data: tx, error: e1 } = await supabase
-        .from('transactions')
-        .select('kind, amount, occurred_at')
-        .gte('occurred_at', since.toISOString());
+function fillKPI(entries){
+  const now=new Date(); const w0=startOfWeek(now), m0=startOfMonth(now), y0=startOfYear(now);
+  const fil=(list,kind)=>sum(list.filter(e=>e.kind===kind).map(e=>e.amount));
+  const W=entries.filter(e=>startOfWeek(e.date).getTime()===w0.getTime());
+  const M=entries.filter(e=>startOfMonth(e.date).getTime()===m0.getTime());
+  const Y=entries.filter(e=>startOfYear(e.date).getTime()===y0.getTime());
+  const wkIn=fil(W,'in'),wkOut=fil(W,'out'); document.getElementById('wkIn').textContent=fmt(wkIn); document.getElementById('wkOut').textContent=fmt(wkOut); document.getElementById('wkNet').textContent=fmt(wkIn-wkOut);
+  const moIn=fil(M,'in'),moOut=fil(M,'out'); document.getElementById('moIn').textContent=fmt(moIn); document.getElementById('moOut').textContent=fmt(moOut); document.getElementById('moNet').textContent=fmt(moIn-moOut);
+  const yrIn=fil(Y,'in'),yrOut=fil(Y,'out'); document.getElementById('yrIn').textContent=fmt(yrIn); document.getElementById('yrOut').textContent=fmt(yrOut); document.getElementById('yrNet').textContent=fmt(yrIn-yrOut);
+}
 
-      if (e1) { console.error(e1); alert('读取 transactions 失败：'+e1.message); }
-
-      // claims（已完成 -> 视为 out）
-      const { data: claims, error: e2 } = await supabase
-        .from('claims')
-        .select('amount, status, created_at, completed_at')
-        .gte('created_at', since.toISOString());
-
-      if (e2) { console.error(e2); alert('读取 claims 失败：'+e2.message); }
-
-      const entries = [];
-
-      // transactions -> entries
-      (tx||[]).forEach(t => {
-        if (!t || !t.kind) return;
-        const when = t.occurred_at || new Date().toISOString();
-        entries.push({ kind: t.kind, amount: Number(t.amount||0), date: when });
-      });
-
-      // claims.completed -> entries(out)
-      (claims||[]).forEach(c => {
-        if (c.status === '已完成') {
-          const when = c.completed_at || c.created_at;
-          entries.push({ kind: 'out', amount: Number(c.amount||0), date: when });
-        }
-      });
-
-      return entries;
-    }
-
-    // 4) 按周 / 月 / 年汇总
-    function bucketWeek(entries){
-      // 生成近 12 周标签，从当前周往前
-      const arr = [];
-      const now = new Date(); let cur = startOfWeek(now);
-      for (let i=11;i>=0;i--){
-        const dt = new Date(cur); dt.setDate(cur.getDate() - i*7);
-        arr.push(dt);
-      }
-      const labels = arr.map(d => ymd(d)); // 周起始日
-      const inVals  = labels.map(()=>0);
-      const outVals = labels.map(()=>0);
-
-      entries.forEach(e=>{
-        const idx = labels.findIndex(label => {
-          const wk = startOfWeek(e.date);
-          return ymd(wk) === label;
-        });
-        if (idx>=0){
-          if (e.kind==='in')  inVals[idx]+=e.amount;
-          if (e.kind==='out') outVals[idx]+=e.amount;
-        }
-      });
-      return { labels, inVals, outVals };
-    }
-
-    function bucketMonth(entries){
-      // 本年 12 个月
-      const now = new Date();
-      const labels = [];
-      for (let m=0;m<12;m++){
-        const dt = new Date(now.getFullYear(), m, 1);
-        labels.push(ym(dt));
-      }
-      const inVals  = labels.map(()=>0);
-      const outVals = labels.map(()=>0);
-      entries.forEach(e=>{
-        const k = ym(e.date);
-        const idx = labels.indexOf(k);
-        if (idx>=0){
-          if (e.kind==='in')  inVals[idx]+=e.amount;
-          if (e.kind==='out') outVals[idx]+=e.amount;
-        }
-      });
-      return { labels, inVals, outVals };
-    }
-
-    function bucketYear(entries){
-      const map = new Map(); // year -> {in,out}
-      entries.forEach(e=>{
-        const y = new Date(e.date).getFullYear();
-        if (!map.has(y)) map.set(y, {in:0,out:0});
-        const obj = map.get(y);
-        if (e.kind==='in')  obj.in  += e.amount;
-        if (e.kind==='out') obj.out += e.amount;
-      });
-      const years = Array.from(map.keys()).sort((a,b)=>a-b);
-      const inVals  = years.map(y=>map.get(y).in);
-      const outVals = years.map(y=>map.get(y).out);
-      return { labels: years.map(String), inVals, outVals };
-    }
-
-    // 5) 画图 + 填 KPI
-    let chW, chM, chY;
-    function drawBar(ctx, labels, inVals, outVals){
-      return new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label: '进账', data: inVals },
-            { label: '出账', data: outVals }
-          ]
-        },
-        options: { responsive:true, maintainAspectRatio:false }
-      });
-    }
-
-    function fillKPIs(entries){
-      const now = new Date();
-      const w0 = startOfWeek(now), m0 = startOfMonth(now), y0 = startOfYear(now);
-      const wk = entries.filter(e => startOfWeek(e.date).getTime() === w0.getTime());
-      const mo = entries.filter(e => startOfMonth(e.date).getTime() === m0.getTime());
-      const yr = entries.filter(e => startOfYear(e.date).getTime()  === y0.getTime());
-
-      const t = (list, kind) => sum(list.filter(e=>e.kind===kind).map(e=>e.amount));
-      const wkIn=t(wk,'in'),  wkOut=t(wk,'out');
-      const moIn=t(mo,'in'),  moOut=t(mo,'out');
-      const yrIn=t(yr,'in'),  yrOut=t(yr,'out');
-
-      document.getElementById('wkIn').textContent  = fmtMoney(wkIn);
-      document.getElementById('wkOut').textContent = fmtMoney(wkOut);
-      document.getElementById('wkNet').textContent = fmtMoney(wkIn - wkOut);
-
-      document.getElementById('moIn').textContent  = fmtMoney(moIn);
-      document.getElementById('moOut').textContent = fmtMoney(moOut);
-      document.getElementById('moNet').textContent = fmtMoney(moIn - moOut);
-
-      document.getElementById('yrIn').textContent  = fmtMoney(yrIn);
-      document.getElementById('yrOut').textContent = fmtMoney(yrOut);
-      document.getElementById('yrNet').textContent = fmtMoney(yrIn - yrOut);
-    }
-
-    // 6) 主流程
-    (async function main(){
-      const entries = await fetchData();
-
-      // KPI
-      fillKPIs(entries);
-
-      // Week
-      const w = bucketWeek(entries);
-      chW = drawBar(document.getElementById('chartWeek'), w.labels, w.inVals, w.outVals);
-
-      // Month
-      const m = bucketMonth(entries);
-      chM = drawBar(document.getElementById('chartMonth'), m.labels, m.inVals, m.outVals);
-
-      // Year
-      const y = bucketYear(entries);
-      chY = drawBar(document.getElementById('chartYear'), y.labels, y.inVals, y.outVals);
-    })();
-  </script>
+(async function(){
+  await checkLogin();
+  const entries=await fetchEntries();
+  fillKPI(entries);
+  const w=bucketWeek(entries); draw('chartWeek', w.labels, w.inVals, w.outVals);
+  const m=bucketMonth(entries); draw('chartMonth', m.labels, m.inVals, m.outVals);
+  const y=bucketYear(entries); draw('chartYear', y.labels, y.inVals, y.outVals);
+})();
+</script>
 </body>
 </html>
