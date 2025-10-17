@@ -9,11 +9,15 @@
     :root{
       --bg:#fbf7ee; --surface:#fff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
       --primary:#d4a016; --primary-600:#b4840e; --primary-100:#fff4d1;
-      --info:#1f5fa3; --info-600:#164a80; --info-100:#e8f2ff;
-      --success:#16a34a; --danger:#dc2626;
+      --info:#1f5fa3; --info-600:#164a80; --success:#16a34a; --danger:#dc2626;
       --radius:12px; --radius-sm:10px; --shadow:0 6px 18px rgba(0,0,0,.06); --shadow-sm:0 3px 10px rgba(0,0,0,.05);
     }
-    body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft Yahei","Noto Sans CJK SC",sans-serif;max-width:880px;margin:28px auto;padding:0 16px}
+    *{box-sizing:border-box}
+    body{
+      background:var(--bg); color:var(--text);
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,"PingFang SC","Microsoft Yahei","Noto Sans CJK SC",sans-serif;
+      max-width:880px; margin:28px auto; padding:0 16px;
+    }
     h1{font-size:22px;margin:0 0 14px;font-weight:700}
     .nav{margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap}
     .btn{border:0;border-radius:var(--radius-sm);padding:9px 14px;font-size:14px;cursor:pointer;transition:transform .08s,box-shadow .2s;box-shadow:var(--shadow-sm)}
@@ -21,16 +25,33 @@
     .btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-600)}
     .btn-info{background:var(--info);color:#fff}.btn-info:hover{background:var(--info-600)}
     .btn-ghost{background:#f3f4f6;color:#111}
-    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-    label{font-size:13px;color:#374151;margin-bottom:6px;display:block}
-    input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;background:#fff;outline:none}
-    input:focus,textarea:focus,select:focus{box-shadow:0 0 0 4px rgba(212,160,22,.12)}
-    .muted{color:var(--muted)}
     .who{font-size:12px;color:var(--muted);margin-left:8px}
-    .hint{font-size:12px;color:var(--muted)}
+
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow)}
+
+    /* ✅ 两列网格，防溢出：minmax(0,1fr) */
+    .grid2{display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:14px}
+    .field{min-width:0} /* 防止内部控件撑破列 */
+    label{font-size:13px;color:#374151;margin-bottom:6px;display:block}
+    input,textarea,select{
+      width:100%; max-width:100%;
+      padding:11px 12px; border:1px solid var(--border); border-radius:var(--radius-sm);
+      font-size:14px; background:#fff; outline:none;
+    }
+    input:focus,textarea:focus,select:focus{box-shadow:0 0 0 4px rgba(212,160,22,.12)}
+    textarea{resize:vertical} /* 只允许竖向拉伸，避免把网格横向顶爆 */
+
+    .hint{font-size:12px;color:var(--muted);margin-top:6px}
+    .muted{color:var(--muted)}
     .ok{color:var(--success)} .err{color:var(--danger)}
+
+    /* 文件区域小优化 */
+    .filewrap{
+      display:flex; align-items:center; gap:10px;
+      padding:10px; border:1px dashed var(--border); border-radius:var(--radius-sm);
+      background:#fff;
+    }
+    .filewrap input[type="file"]{padding:6px; border:0; box-shadow:none}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -44,37 +65,36 @@
   <h1>🧾 新增账单（可多张收据）</h1>
 
   <div class="card">
-    <div class="row">
-      <div>
+    <div class="grid2">
+      <div class="field">
         <label>提交人姓名 *</label>
         <input id="name" placeholder="例如：王小明" required />
       </div>
-      <div>
+      <div class="field">
         <label>金额（MYR） *</label>
         <input id="amount" type="number" step="0.01" placeholder="例如：120.00" required />
       </div>
-    </div>
 
-    <div class="row">
-      <div>
+      <div class="field">
         <label>用途（买了啥/用在哪里） *</label>
         <textarea id="purpose" rows="3" placeholder="简单描述…"></textarea>
       </div>
-      <div>
+      <div class="field">
         <label>银行 *</label>
         <input id="bank" placeholder="MAYBANK / CIMB…" />
         <div class="hint">可手填银行名</div>
       </div>
-    </div>
 
-    <div class="row">
-      <div>
+      <div class="field">
         <label>账户号 *</label>
         <input id="account" placeholder="例如：112-345-6789" />
       </div>
-      <div>
+      <div class="field">
         <label>收据（可多选，PDF 或 图片，≤10MB/文件）</label>
-        <input id="files" type="file" multiple accept="image/*,.pdf" />
+        <div class="filewrap">
+          <input id="files" type="file" multiple accept="image/*,.pdf" />
+          <div class="muted" id="fileHint">未选择任何文件</div>
+        </div>
       </div>
     </div>
 
@@ -85,8 +105,8 @@
   </div>
 
 <script>
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 async function checkLogin(){
@@ -96,7 +116,18 @@ async function checkLogin(){
 }
 async function logout(){ await supabase.auth.signOut(); location.href="/login.html"; }
 
-function setMsg(text, ok=false){ const el=document.getElementById('msg'); el.textContent=text; el.className= ok ? 'ok' : 'err'; if(!text){ el.className='muted'; } }
+const fileInput = document.getElementById('files');
+const fileHint  = document.getElementById('fileHint');
+fileInput?.addEventListener('change', () => {
+  const n = fileInput.files?.length || 0;
+  fileHint.textContent = n ? `已选择 ${n} 个文件` : '未选择任何文件';
+});
+
+function setMsg(text, ok=false){
+  const el=document.getElementById('msg');
+  el.textContent=text;
+  el.className = ok ? 'ok' : (text ? 'err' : 'muted');
+}
 
 async function submitClaim(){
   setMsg("正在提交…", true);
@@ -123,7 +154,8 @@ async function submitClaim(){
   // 2) 上传多张收据 + 写入 attachments
   if(files && files.length){
     for(const f of files){
-      const path = `receipts/${claim.id}/${Date.now()}_${encodeURIComponent(f.name)}`;
+      const filename = `${Date.now()}_${encodeURIComponent(f.name)}`;
+      const path = `receipts/${claim.id}/${filename}`;
       const { error: eUp } = await supabase.storage.from('receipts').upload(path, f, { upsert:false });
       if(eUp){ setMsg("上传失败："+eUp.message); console.error(eUp); return; }
 
