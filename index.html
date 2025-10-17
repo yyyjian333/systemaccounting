@@ -81,6 +81,20 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+      // 自动检测登录状态
+  async function checkLogin() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      alert("请先登录！");
+      window.location.href = "/login.html";
+      return null;
+    }
+    return session.user;
+  }
+
+  // 一进入页面就检查是否登录
+  checkLogin();
+
     const statusClass = (s) => s === '已完成' ? 'green' : (s === '审核中' ? 'yellow' : 'blue');
 
     async function loadClaims({ kw = '', st = '' } = {}){
