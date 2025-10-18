@@ -182,7 +182,40 @@
 const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script>
+async function ensureProfile() {
+  const { data: { user }, error: errUser } = await supabase.auth.getUser();
+  if (errUser) throw errUser;
+  if (!user) return null;
 
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const fullName =
+    user.user_metadata?.full_name ||
+    user.user_metadata?.name ||
+    (user.email ? user.email.split('@')[0] : '未命名用户');
+
+  if (!prof) {
+    const { error: insErr } = await supabase
+      .from('profiles')
+      .insert({ id: user.id, full_name: fullName, role: 'user' });
+    if (insErr && insErr.code !== '23505') {
+      console.error('创建 profile 失败:', insErr);
+    }
+  } else {
+    await supabase.from('profiles')
+      .update({ full_name: fullName })
+      .eq('id', user.id)
+      .limit(1);
+  }
+  return user;
+}
+</script>
+  
 let isAdmin = false;
 let currentUser = null;
 
