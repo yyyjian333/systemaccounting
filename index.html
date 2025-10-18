@@ -7,29 +7,29 @@
   <!-- 品牌化外观 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    /* —— 主题变量（来自你Logo的金色 + 深蓝） —— */
+    /* —— 主题变量（品牌金色 + 深蓝） —— */
     :root{
-      --bg: #fbf7ee;            /* 淡米色背景 */
-      --surface: #ffffff;       /* 卡片底色 */
-      --text: #1f2937;          /* 正文颜色 */
-      --muted: #6b7280;         /* 次要文字 */
-      --border: #e5e7eb;        /* 边框色 */
+      --bg: #fbf7ee;           /* 淡米色背景 */
+      --surface: #ffffff;      /* 卡片底色 */
+      --text: #1f2937;         /* 正文颜色 */
+      --muted: #6b7280;        /* 次要文字 */
+      --border: #e5e7eb;       /* 边框色 */
 
-      --primary: #d4a016;       /* 品牌金色（主色） */
-      --primary-600:#b4840e;    /* hover 深一点的金 */
-      --primary-100:#fff4d1;    /* 浅金背景 */
+      --primary: #d4a016;      /* 品牌金色（主色） */
+      --primary-600:#b4840e;
+      --primary-100:#fff4d1;
 
-      --info: #1f5fa3;          /* 品牌深蓝（操作色） */
+      --info: #1f5fa3;         /* 品牌深蓝（操作色） */
       --info-600:#164a80;
       --info-100:#e8f2ff;
 
-      --success:#16a34a;        /* 通过：绿 */
+      --success:#16a34a;       /* 通过：绿 */
       --success-100:#e9f8ee;
 
-      --warning:#f59e0b;        /* 审核中：黄 */
+      --warning:#f59e0b;       /* 审核中：黄 */
       --warning-100:#fff6db;
 
-      --danger:#dc2626;         /* 拒绝：红 */
+      --danger:#dc2626;        /* 拒绝：红 */
       --danger-100:#ffeaea;
 
       --radius: 12px;
@@ -105,12 +105,24 @@
     /* 文本小样式 */
     .muted{color:var(--muted)}
     .empty{padding:24px;text-align:center;color:var(--muted)}
+
+    /* ===== 新增进账弹窗样式 ===== */
+    .modal{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none;
+           align-items:center; justify-content:center; z-index:1000;}
+    .modal-content{background:#fff; padding:22px 24px; border-radius:12px; width:100%; max-width:380px;
+                   box-shadow:0 12px 28px rgba(0,0,0,.15)}
+    .modal-content h3{margin:0 0 10px}
+    .modal-content label{display:block; font-size:13px; color:#374151; margin:10px 0 6px}
+    .modal-content input{width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:10px; font-size:14px}
+    .modal-content input:focus{outline:none; box-shadow:0 0 0 4px rgba(212,160,22,.12)}
+    .modal-actions{display:flex; gap:10px; margin-top:12px}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="nav">
     <a class="btn btn-primary" href="/submit.html">➕ 新增账单</a>
+    <button class="btn btn-info" onclick="openIncomeModal()">➕ 新增进账</button>
     <a class="btn btn-info" href="/dashboard.html">📊 Dashboard</a>
     <a class="btn btn-ghost" href="#" onclick="logout()">🚪 登出</a>
     <span id="who" class="who"></span>
@@ -147,8 +159,26 @@
     <div id="empty" class="empty" style="display:none">目前还没有数据，点左上角「新增账单」试试～</div>
   </div>
 
+  <!-- ===== 新增进账弹窗 ===== -->
+  <div id="incomeModal" class="modal">
+    <div class="modal-content">
+      <h3>新增进账</h3>
+      <label>金额（MYR）*</label>
+      <input id="inAmount" type="number" step="0.01" placeholder="例如：1000.00" />
+      <label>备注</label>
+      <input id="inNote" placeholder="例如：客户转账 / 销售回款" />
+      <label>日期</label>
+      <input id="inDate" type="date" />
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="saveIncome()">保存</button>
+        <button class="btn btn-ghost" onclick="closeIncomeModal()">取消</button>
+      </div>
+      <p id="incomeMsg" class="muted" style="margin-top:8px"></p>
+    </div>
+  </div>
+
 <script>
-/* ===== Supabase 初始化：替换你的 URL / KEY ===== */
+/* ============ Supabase 初始化 ============ */
 const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -156,7 +186,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let isAdmin = false;
 let currentUser = null;
 
-/* ===== 自动建档：首次登录自动在 profiles 写入一行 ===== */
+  /* ===== 自动建档：首次登录自动在 profiles 写入一行 ===== */
 async function ensureProfile() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -170,77 +200,97 @@ async function ensureProfile() {
   return user;
 }
 
-/* ===== 登录校验 + 角色判定 ===== */
+/* 登录校验 + 读取角色 */
 async function checkLoginAndRole() {
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { alert('请先登录'); location.href='/login.html'; return; }
+  if (!session) {
+    alert("请先登录！");
+    window.location.href = "/login.html";
+    return;
+  }
   currentUser = session.user;
-  document.getElementById('who').textContent = currentUser.email ?? '';
-  await ensureProfile();
+  document.getElementById('who').textContent = currentUser.email;
 
   const { data: prof } = await supabase
     .from('profiles')
     .select('role, full_name')
     .eq('id', currentUser.id)
     .maybeSingle();
+
   isAdmin = prof?.role === 'admin';
   if (isAdmin) document.getElementById('thActions').style.display = '';
 }
 
-/* ===== 读取列表 ===== */
-function badgeClass(st){
-  if(st==='已完成') return 'b-green';
-  if(st==='审核中') return 'b-yellow';
-  if(st==='拒绝') return 'b-red';
-  return 'b-blue'; // 已提交
-}
-const esc = s => String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-
-function renderThumb(url){
-  if (/\.pdf(\?|$)/i.test(url)) return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
-  return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt"></a>`;
+async function logout(){
+  await supabase.auth.signOut();
+  window.location.href = "/login.html";
 }
 
-async function loadClaims({kw='',st=''}={}){
-  const status=document.getElementById('status');
-  const tbl=document.getElementById('tbl');
-  const rows=document.getElementById('rows');
-  const empty=document.getElementById('empty');
+/* 状态徽章颜色 */
+const statusClass = (s) =>
+  s === '已完成' ? 'green' :
+  s === '审核中' ? 'yellow' :
+  s === '拒绝' ? 'red' :
+  'blue';
 
-  status.style.display=''; tbl.style.display='none'; empty.style.display='none';
-  status.textContent='正在加载…';
+const esc = s => String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-  let q = supabase.from('claims').select('id,submitter_name,amount,purpose,bank_name,account_no,status,created_at').order('created_at',{ascending:false});
+/* 读取账单（claims + attachments 两步） */
+async function loadClaims({ kw = '', st = '' } = {}){
+  const status = document.getElementById('status');
+  const table  = document.getElementById('tbl');
+  const tbody  = document.getElementById('rows');
+  const empty  = document.getElementById('empty');
+
+  status.textContent = "正在加载…";
+  table.style.display = 'none';
+  empty.style.display = 'none';
+
+  let q = supabase.from('claims')
+    .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, reviewed_at, completed_at')
+    .order('created_at', { ascending: false });
+
   if (kw) {
     const k = kw.replace(/,/g,'');
     q = q.or(`submitter_name.ilike.%${k}%,purpose.ilike.%${k}%,bank_name.ilike.%${k}%`);
   }
   if (st) q = q.eq('status', st);
 
-  const { data: claims, error } = await q;
-  if (error){ console.error(error); alert('读取数据失败：'+error.message); return; }
+  const { data: claims, error: e1 } = await q;
+  if (e1) { status.textContent = "读取失败：" + e1.message; console.error(e1); return; }
+  if (!claims || !claims.length) { status.style.display = 'none'; empty.style.display = ''; return; }
 
-  if (!claims || !claims.length){ status.style.display='none'; empty.style.display=''; rows.innerHTML=''; return; }
+  const ids = claims.map(c => c.id);
+  const { data: atts, error: e2 } = await supabase.from('attachments')
+    .select('claim_id, file_url, type')
+    .in('claim_id', ids);
+  if (e2) console.error(e2);
 
-  const ids = claims.map(c=>c.id);
-  const { data: atts } = await supabase.from('attachments').select('claim_id,file_url,type').in('claim_id', ids);
-  const map=new Map(); (atts||[]).forEach(a=>{ if(!map.has(a.claim_id)) map.set(a.claim_id,[]); map.get(a.claim_id).push(a); });
+  const map = new Map();
+  (atts||[]).forEach(a => { if (!map.has(a.claim_id)) map.set(a.claim_id, []); map.get(a.claim_id).push(a); });
 
-  status.style.display='none'; tbl.style.display='';
+  status.style.display = 'none';
+  table.style.display  = '';
 
-  rows.innerHTML = claims.map(c=>{
-    const list = map.get(c.id)||[];
-    const thumbs = list.length ? `<div class="thumbs">${list.slice(0,4).map(a=>renderThumb(a.file_url)).join('')}</div>` : '<span class="muted">无</span>';
-    let actions='';
-    if (isAdmin){
-      if (c.status==='已提交'){
-        actions = `<button class="btn" onclick="setStatus(${c.id},'审核中')">设为审核中</button>`;
-      }else if (c.status==='审核中'){
-        actions = `<button class="btn" onclick="setStatus(${c.id},'已完成')">设为已完成</button>
-                   <button class="btn" onclick="setStatus(${c.id},'已提交')" style="margin-left:6px">退回已提交</button>
-                   <button class="btn" onclick="setStatus(${c.id},'拒绝')" style="margin-left:6px">拒绝</button>`;
+  tbody.innerHTML = claims.map(c => {
+    const list = map.get(c.id) || [];
+    const thumbs = list.length
+      ? `<div class="thumbs">${list.slice(0,3).map(a=>renderThumb(a.file_url)).join('')}
+         ${list.length>3?`<span class="muted">+${list.length-3} 更多…</span>`:''}</div>`
+      : `<span class="muted">无</span>`;
+
+    // 管理员操作按钮
+    let actions = '';
+    if (isAdmin) {
+      if (c.status === '已提交') {
+        actions = `<button class="btn btn-info"    onclick="setStatus(${c.id}, '审核中')">设为审核中</button>`;
+      } else if (c.status === '审核中') {
+        actions = `<button class="btn btn-success" onclick="setStatus(${c.id}, '已完成')">设为已完成</button>
+                   <button class="btn btn-ghost"   style="margin-left:6px" onclick="setStatus(${c.id}, '已提交')">退回已提交</button>
+                   <button class="btn btn-danger"  style="margin-left:6px" onclick="setStatus(${c.id}, '拒绝')">拒绝</button>`;
       }
     }
+
     return `<tr>
       <td>${c.id}</td>
       <td>${esc(c.submitter_name)}</td>
@@ -248,7 +298,7 @@ async function loadClaims({kw='',st=''}={}){
       <td>${esc(c.purpose)}</td>
       <td>${esc(c.bank_name)}</td>
       <td>${esc(c.account_no)}</td>
-      <td><span class="badge ${badgeClass(c.status)}">${esc(c.status)}</span></td>
+      <td><span class="badge ${statusClass(c.status)}">${esc(c.status)}</span></td>
       <td>${new Date(c.created_at).toLocaleString()}</td>
       <td>${thumbs}</td>
       <td>${actions}</td>
@@ -256,41 +306,62 @@ async function loadClaims({kw='',st=''}={}){
   }).join('');
 }
 
-async function setStatus(id, next){
-  const payload={status:next};
-  if (next==='审核中') payload.reviewed_at=new Date().toISOString();
-  if (next==='已完成')  payload.completed_at=new Date().toISOString();
-  const { error } = await supabase.from('claims').update(payload).eq('id', id);
-  if (error){ alert('更新失败：'+error.message); return; }
-  loadClaims({kw:document.getElementById('kw').value.trim(), st:document.getElementById('st').value});
+function renderThumb(url){
+  const isPdf = /\.pdf(\?|$)/i.test(url);
+  if (isPdf) return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
+  return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
 }
 
-async function logout(){ await supabase.auth.signOut(); location.href='/login.html'; }
+/* 审批状态更新（admin 权限） */
+async function setStatus(id, next){
+  const payload = { status: next };
+  if (next === '审核中') payload.reviewed_at = new Date().toISOString();
+  if (next === '已完成')  payload.completed_at = new Date().toISOString();
 
-/* ===== 搜索事件 ===== */
-document.getElementById('btnSearch').addEventListener('click', ()=>{
-  loadClaims({kw:document.getElementById('kw').value.trim(), st:document.getElementById('st').value});
+  const { error } = await supabase.from('claims').update(payload).eq('id', id);
+  if (error) { alert('更新失败：' + error.message); console.error(error); return; }
+  loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
+}
+
+/* ===== 新增进账：打开/关闭/保存 ===== */
+function openIncomeModal(){
+  document.getElementById('incomeModal').style.display = 'flex';
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('inDate').value = today;
+  document.getElementById('incomeMsg').textContent = '';
+  document.getElementById('inAmount').value = '';
+  document.getElementById('inNote').value = '';
+}
+function closeIncomeModal(){
+  document.getElementById('incomeModal').style.display = 'none';
+}
+async function saveIncome(){
+  const amount = parseFloat(document.getElementById('inAmount').value);
+  const note = document.getElementById('inNote').value.trim();
+  const date = document.getElementById('inDate').value;
+  const msg = document.getElementById('incomeMsg');
+  if(!amount){ msg.textContent="请填写金额"; return; }
+
+  const { error } = await supabase.from('transactions')
+    .insert({ kind:'in', amount, note, occurred_at: date ? new Date(date) : new Date() });
+
+  if(error){ msg.textContent="保存失败："+error.message; console.error(error); return; }
+
+  msg.textContent="✅ 保存成功！";
+  setTimeout(()=>{ closeIncomeModal(); }, 700);
+}
+
+/* 事件绑定 */
+document.getElementById('btnSearch').addEventListener('click', () => {
+  loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
 });
-document.getElementById('btnClear').addEventListener('click', ()=>{
-  document.getElementById('kw').value=''; document.getElementById('st').value='';
+document.getElementById('btnClear').addEventListener('click', () => {
+  document.getElementById('kw').value = '';
+  document.getElementById('st').value = '';
   loadClaims({});
 });
 
-/* ===== 新增进账（保留、极简） ===== */
-function openIncomeModal(){ document.getElementById('incomeModal').style.display='flex'; document.getElementById('inDate').value = new Date().toISOString().slice(0,10); document.getElementById('incomeMsg').textContent=''; }
-function closeIncomeModal(){ document.getElementById('incomeModal').style.display='none'; }
-async function saveIncome(){
-  const amount=parseFloat(document.getElementById('inAmount').value);
-  const note=document.getElementById('inNote').value.trim();
-  const date=document.getElementById('inDate').value;
-  const msg=document.getElementById('incomeMsg');
-  if(!amount){ msg.textContent='请填写金额'; return; }
-  const { error } = await supabase.from('transactions').insert({ kind:'in', amount, note, occurred_at: date? new Date(date): new Date() });
-  if (error){ msg.textContent='保存失败：'+error.message; return; }
-  msg.textContent='保存成功'; setTimeout(()=>{ closeIncomeModal(); }, 600);
-}
-
-/* ===== 初始化 ===== */
+/* 页面初始化 */
 (async function init(){
   await checkLoginAndRole();
   await loadClaims();
