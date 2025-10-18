@@ -7,29 +7,29 @@
   <!-- 品牌化外观 -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    /* —— 主题变量（来自你Logo的金色 + 深蓝） —— */
+    /* —— 主题变量（品牌金色 + 深蓝） —— */
     :root{
-      --bg: #fbf7ee;            /* 淡米色背景 */
-      --surface: #ffffff;       /* 卡片底色 */
-      --text: #1f2937;          /* 正文颜色 */
-      --muted: #6b7280;         /* 次要文字 */
-      --border: #e5e7eb;        /* 边框色 */
+      --bg: #fbf7ee;           /* 淡米色背景 */
+      --surface: #ffffff;      /* 卡片底色 */
+      --text: #1f2937;         /* 正文颜色 */
+      --muted: #6b7280;        /* 次要文字 */
+      --border: #e5e7eb;       /* 边框色 */
 
-      --primary: #d4a016;       /* 品牌金色（主色） */
-      --primary-600:#b4840e;    /* hover 深一点的金 */
-      --primary-100:#fff4d1;    /* 浅金背景 */
+      --primary: #d4a016;      /* 品牌金色（主色） */
+      --primary-600:#b4840e;
+      --primary-100:#fff4d1;
 
-      --info: #1f5fa3;          /* 品牌深蓝（操作色） */
+      --info: #1f5fa3;         /* 品牌深蓝（操作色） */
       --info-600:#164a80;
       --info-100:#e8f2ff;
 
-      --success:#16a34a;        /* 通过：绿 */
+      --success:#16a34a;       /* 通过：绿 */
       --success-100:#e9f8ee;
 
-      --warning:#f59e0b;        /* 审核中：黄 */
+      --warning:#f59e0b;       /* 审核中：黄 */
       --warning-100:#fff6db;
 
-      --danger:#dc2626;         /* 拒绝：红 */
+      --danger:#dc2626;        /* 拒绝：红 */
       --danger-100:#ffeaea;
 
       --radius: 12px;
@@ -105,12 +105,24 @@
     /* 文本小样式 */
     .muted{color:var(--muted)}
     .empty{padding:24px;text-align:center;color:var(--muted)}
+
+    /* ===== 新增进账弹窗样式 ===== */
+    .modal{position:fixed; inset:0; background:rgba(0,0,0,.45); display:none;
+           align-items:center; justify-content:center; z-index:1000;}
+    .modal-content{background:#fff; padding:22px 24px; border-radius:12px; width:100%; max-width:380px;
+                   box-shadow:0 12px 28px rgba(0,0,0,.15)}
+    .modal-content h3{margin:0 0 10px}
+    .modal-content label{display:block; font-size:13px; color:#374151; margin:10px 0 6px}
+    .modal-content input{width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:10px; font-size:14px}
+    .modal-content input:focus{outline:none; box-shadow:0 0 0 4px rgba(212,160,22,.12)}
+    .modal-actions{display:flex; gap:10px; margin-top:12px}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="nav">
     <a class="btn btn-primary" href="/submit.html">➕ 新增账单</a>
+    <button class="btn btn-info" onclick="openIncomeModal()">➕ 新增进账</button>
     <a class="btn btn-info" href="/dashboard.html">📊 Dashboard</a>
     <a class="btn btn-ghost" href="#" onclick="logout()">🚪 登出</a>
     <span id="who" class="who"></span>
@@ -145,6 +157,24 @@
       <tbody id="rows"></tbody>
     </table>
     <div id="empty" class="empty" style="display:none">目前还没有数据，点左上角「新增账单」试试～</div>
+  </div>
+
+  <!-- ===== 新增进账弹窗 ===== -->
+  <div id="incomeModal" class="modal">
+    <div class="modal-content">
+      <h3>新增进账</h3>
+      <label>金额（MYR）*</label>
+      <input id="inAmount" type="number" step="0.01" placeholder="例如：1000.00" />
+      <label>备注</label>
+      <input id="inNote" placeholder="例如：客户转账 / 销售回款" />
+      <label>日期</label>
+      <input id="inDate" type="date" />
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="saveIncome()">保存</button>
+        <button class="btn btn-ghost" onclick="closeIncomeModal()">取消</button>
+      </div>
+      <p id="incomeMsg" class="muted" style="margin-top:8px"></p>
+    </div>
   </div>
 
 <script>
@@ -235,7 +265,7 @@ async function loadClaims({ kw = '', st = '' } = {}){
          ${list.length>3?`<span class="muted">+${list.length-3} 更多…</span>`:''}</div>`
       : `<span class="muted">无</span>`;
 
-    // 管理员操作按钮：金蓝体系的漂亮按钮
+    // 管理员操作按钮
     let actions = '';
     if (isAdmin) {
       if (c.status === '已提交') {
@@ -277,6 +307,34 @@ async function setStatus(id, next){
   const { error } = await supabase.from('claims').update(payload).eq('id', id);
   if (error) { alert('更新失败：' + error.message); console.error(error); return; }
   loadClaims({ kw: document.getElementById('kw').value.trim(), st: document.getElementById('st').value });
+}
+
+/* ===== 新增进账：打开/关闭/保存 ===== */
+function openIncomeModal(){
+  document.getElementById('incomeModal').style.display = 'flex';
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('inDate').value = today;
+  document.getElementById('incomeMsg').textContent = '';
+  document.getElementById('inAmount').value = '';
+  document.getElementById('inNote').value = '';
+}
+function closeIncomeModal(){
+  document.getElementById('incomeModal').style.display = 'none';
+}
+async function saveIncome(){
+  const amount = parseFloat(document.getElementById('inAmount').value);
+  const note = document.getElementById('inNote').value.trim();
+  const date = document.getElementById('inDate').value;
+  const msg = document.getElementById('incomeMsg');
+  if(!amount){ msg.textContent="请填写金额"; return; }
+
+  const { error } = await supabase.from('transactions')
+    .insert({ kind:'in', amount, note, occurred_at: date ? new Date(date) : new Date() });
+
+  if(error){ msg.textContent="保存失败："+error.message; console.error(error); return; }
+
+  msg.textContent="✅ 保存成功！";
+  setTimeout(()=>{ closeIncomeModal(); }, 700);
 }
 
 /* 事件绑定 */
