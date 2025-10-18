@@ -1,263 +1,264 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+<!doctype html>
+<html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>RM 账单系统</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RM 账单列表</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+  <!-- 经典简洁风样式 -->
   <style>
-    body {
-      font-family: "Microsoft YaHei", sans-serif;
-      background-color: #fdf8f3;
-      margin: 0;
-      padding: 20px;
-      color: #333;
+    :root{
+      --bg:#fafafa; --surface:#fff; --text:#222; --muted:#666; --border:#e5e5e5;
+      --primary:#1f5fa3; --primary-600:#184c82;
+      --green:#16a34a; --red:#dc2626; --yellow:#eab308; --blue:#2563eb;
+      --radius:10px;
     }
-
-    h2 {
-      color: #004b91;
-      margin-bottom: 20px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: white;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-      border-radius: 10px;
-      overflow: hidden;
-    }
-
-    th, td {
-      padding: 12px 15px;
-      text-align: left;
-      border-bottom: 1px solid #eee;
-    }
-
-    th {
-      background-color: #004b91;
-      color: #fff;
-    }
-
-    tr:hover {
-      background-color: #f9f9f9;
-    }
-
-    .btn {
-      padding: 6px 12px;
-      border: none;
-      border-radius: 6px;
-      font-size: 14px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .btn-blue {
-      background-color: #004b91;
-      color: white;
-    }
-
-    .btn-blue:hover {
-      background-color: #00366d;
-    }
-
-    .btn-yellow {
-      background-color: #e6b400;
-      color: white;
-    }
-
-    .btn-yellow:hover {
-      background-color: #c79c00;
-    }
-
-    .btn-green {
-      background-color: #007b5e;
-      color: white;
-    }
-
-    .btn-green:hover {
-      background-color: #005f47;
-    }
-
-    .btn-red {
-      background-color: #d9534f;
-      color: white;
-    }
-
-    .btn-red:hover {
-      background-color: #b52b27;
-    }
-
-    .status {
-      padding: 4px 8px;
-      border-radius: 6px;
-      font-weight: bold;
-      display: inline-block;
-    }
-    .status-已提交 { background-color: #d0e7ff; color: #004b91; }
-    .status-审核中 { background-color: #fff3cd; color: #856404; }
-    .status-已完成 { background-color: #d4edda; color: #155724; }
-    .status-拒绝 { background-color: #f8d7da; color: #721c24; }
-
-    .header-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .logo {
-      font-size: 24px;
-      font-weight: bold;
-      color: #004b91;
-    }
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,'PingFang SC','Microsoft Yahei',sans-serif}
+    .wrap{max-width:1100px;margin:22px auto;padding:0 16px}
+    .header{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .h-left{font-weight:700;font-size:18px}
+    .h-right{display:flex;gap:8px;align-items:center;color:var(--muted)}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer}
+    .btn:hover{background:#f7f7f7}
+    .btn-primary{border-color:#cbd5e1;background:#eef2ff}
+    .muted{color:var(--muted)}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    .filters input,.filters select{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:#fff}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{font-weight:600;background:#f6f6f6;border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:10px;text-align:left}
+    tbody td{border-bottom:1px solid var(--border);padding:10px;background:#fff}
+    tr:hover td{background:#fafafa}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #ddd}
+    .b-blue{color:#1e40af;background:#eef2ff;border-color:#dbeafe}
+    .b-yellow{color:#854d0e;background:#fff7d6;border-color:#fde68a}
+    .b-green{color:#166534;background:#eaffee;border-color:#bbf7d0}
+    .b-red{color:#9f1239;background:#ffe4e6;border-color:#fecdd3}
+    .thumbs{display:flex;gap:6px;flex-wrap:wrap}
+    .thumbs img{width:44px;height:44px;object-fit:cover;border:1px solid var(--border);border-radius:6px}
+    .pdf{display:inline-block;padding:4px 6px;border:1px solid var(--border);border-radius:6px;text-decoration:none;color:var(--text)}
+    .empty{padding:18px;text-align:center;color:var(--muted)}
+    /* 简洁弹窗 */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:1000}
+    .modal-content{background:#fff;border:1px solid var(--border);border-radius:10px;padding:16px;width:100%;max-width:360px}
+    .modal-content h3{margin:0 0 8px 0}
+    .modal-content label{display:block;margin:8px 0 4px}
+    .modal-content input{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+    .modal-actions{display:flex;gap:8px;margin-top:10px}
   </style>
 </head>
 
 <body>
-  <div class="header-bar">
-    <div class="logo">📘 RM 账单系统</div>
-    <div>
-      当前用户：<span id="who"></span>
-      <button class="btn btn-blue" onclick="logout()">登出</button>
-      <a href="/submit.html" class="btn btn-green">➕ 新增账单</a>
-      <a href="/dashboard.html" class="btn btn-yellow">📊 Dashboard</a>
+<div class="wrap">
+  <div class="header">
+    <div class="h-left">RM 账单系统</div>
+    <div class="h-right">
+      <span>当前用户：<span id="who" class="muted">…</span></span>
+      <button class="btn" onclick="logout()">登出</button>
+      <a class="btn" href="/submit.html">➕ 新增账单</a>
+      <a class="btn" href="/dashboard.html">📊 Dashboard</a>
+      <button class="btn btn-primary" onclick="openIncomeModal()">新增进账</button>
     </div>
   </div>
 
-  <h2>我的账单（演示版）</h2>
+  <h3 style="margin:10px 0 12px">我的账单（演示版）</h3>
 
-  <table id="claimsTable">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>提交人</th>
-        <th>金额</th>
-        <th>用途</th>
-        <th>银行</th>
-        <th>账户</th>
-        <th>状态</th>
-        <th>创建时间</th>
-        <th id="thActions" style="display:none;">操作</th>
-      </tr>
-    </thead>
-    <tbody id="claimsBody"></tbody>
-  </table>
+  <div class="card">
+    <div class="filters">
+      <input id="kw" placeholder="搜索：姓名/用途/银行…" />
+      <select id="st">
+        <option value="">全部状态</option>
+        <option value="已提交">已提交</option>
+        <option value="审核中">审核中</option>
+        <option value="已完成">已完成</option>
+        <option value="拒绝">拒绝</option>
+      </select>
+      <button id="btnSearch" class="btn">搜索</button>
+      <button id="btnClear" class="btn">清空</button>
+    </div>
 
-  <script>
+    <div id="status" class="muted">正在加载…</div>
+    <table id="tbl" style="display:none">
+      <thead>
+        <tr>
+          <th>ID</th><th>提交人</th><th>金额</th><th>用途</th>
+          <th>银行</th><th>账户</th><th>状态</th><th>创建时间</th><th>收据</th>
+          <th id="thActions" style="display:none">操作</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none">暂无数据</div>
+  </div>
+</div>
+
+<!-- 新增进账弹窗（保留，但样式极简） -->
+<div id="incomeModal" class="modal">
+  <div class="modal-content">
+    <h3>新增进账</h3>
+    <label>金额（MYR）*</label>
+    <input id="inAmount" type="number" step="0.01" placeholder="例如：1000.00" />
+    <label>备注</label>
+    <input id="inNote" placeholder="例如：客户转账" />
+    <label>日期</label>
+    <input id="inDate" type="date" />
+    <div class="modal-actions">
+      <button class="btn" onclick="saveIncome()">保存</button>
+      <button class="btn" onclick="closeIncomeModal()">取消</button>
+    </div>
+    <p id="incomeMsg" class="muted" style="margin:6px 0 0"></p>
+  </div>
+</div>
+
+<script>
+/* ===== Supabase 初始化：替换你的 URL / KEY ===== */
 const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let currentUser = null;
-    let isAdmin = false;
+let isAdmin = false;
+let currentUser = null;
 
-    async function ensureProfile() {
-      const { data: { user }, error: errUser } = await supabase.auth.getUser();
-      if (errUser) throw errUser;
-      if (!user) return null;
+/* ===== 自动建档：首次登录自动在 profiles 写入一行 ===== */
+async function ensureProfile() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: prof } = await supabase.from('profiles').select('id').eq('id', user.id).maybeSingle();
+  const name = user.user_metadata?.full_name || user.user_metadata?.name || (user.email ? user.email.split('@')[0] : '未命名用户');
+  if (!prof) {
+    await supabase.from('profiles').insert({ id: user.id, full_name: name, role: 'user' });
+  } else {
+    await supabase.from('profiles').update({ full_name: name }).eq('id', user.id).limit(1);
+  }
+  return user;
+}
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
+/* ===== 登录校验 + 角色判定 ===== */
+async function checkLoginAndRole() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) { alert('请先登录'); location.href='/login.html'; return; }
+  currentUser = session.user;
+  document.getElementById('who').textContent = currentUser.email ?? '';
+  await ensureProfile();
 
-      const fullName =
-        user.user_metadata?.full_name ||
-        user.user_metadata?.name ||
-        (user.email ? user.email.split('@')[0] : '未命名用户');
+  const { data: prof } = await supabase
+    .from('profiles')
+    .select('role, full_name')
+    .eq('id', currentUser.id)
+    .maybeSingle();
+  isAdmin = prof?.role === 'admin';
+  if (isAdmin) document.getElementById('thActions').style.display = '';
+}
 
-      if (!prof) {
-        await supabase
-          .from('profiles')
-          .insert({ id: user.id, full_name: fullName, role: 'user' });
-      } else {
-        await supabase.from('profiles')
-          .update({ full_name: fullName })
-          .eq('id', user.id)
-          .limit(1);
+/* ===== 读取列表 ===== */
+function badgeClass(st){
+  if(st==='已完成') return 'b-green';
+  if(st==='审核中') return 'b-yellow';
+  if(st==='拒绝') return 'b-red';
+  return 'b-blue'; // 已提交
+}
+const esc = s => String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function renderThumb(url){
+  if (/\.pdf(\?|$)/i.test(url)) return `<a class="pdf" href="${url}" target="_blank" rel="noopener">PDF</a>`;
+  return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt"></a>`;
+}
+
+async function loadClaims({kw='',st=''}={}){
+  const status=document.getElementById('status');
+  const tbl=document.getElementById('tbl');
+  const rows=document.getElementById('rows');
+  const empty=document.getElementById('empty');
+
+  status.style.display=''; tbl.style.display='none'; empty.style.display='none';
+  status.textContent='正在加载…';
+
+  let q = supabase.from('claims').select('id,submitter_name,amount,purpose,bank_name,account_no,status,created_at').order('created_at',{ascending:false});
+  if (kw) {
+    const k = kw.replace(/,/g,'');
+    q = q.or(`submitter_name.ilike.%${k}%,purpose.ilike.%${k}%,bank_name.ilike.%${k}%`);
+  }
+  if (st) q = q.eq('status', st);
+
+  const { data: claims, error } = await q;
+  if (error){ console.error(error); alert('读取数据失败：'+error.message); return; }
+
+  if (!claims || !claims.length){ status.style.display='none'; empty.style.display=''; rows.innerHTML=''; return; }
+
+  const ids = claims.map(c=>c.id);
+  const { data: atts } = await supabase.from('attachments').select('claim_id,file_url,type').in('claim_id', ids);
+  const map=new Map(); (atts||[]).forEach(a=>{ if(!map.has(a.claim_id)) map.set(a.claim_id,[]); map.get(a.claim_id).push(a); });
+
+  status.style.display='none'; tbl.style.display='';
+
+  rows.innerHTML = claims.map(c=>{
+    const list = map.get(c.id)||[];
+    const thumbs = list.length ? `<div class="thumbs">${list.slice(0,4).map(a=>renderThumb(a.file_url)).join('')}</div>` : '<span class="muted">无</span>';
+    let actions='';
+    if (isAdmin){
+      if (c.status==='已提交'){
+        actions = `<button class="btn" onclick="setStatus(${c.id},'审核中')">设为审核中</button>`;
+      }else if (c.status==='审核中'){
+        actions = `<button class="btn" onclick="setStatus(${c.id},'已完成')">设为已完成</button>
+                   <button class="btn" onclick="setStatus(${c.id},'已提交')" style="margin-left:6px">退回已提交</button>
+                   <button class="btn" onclick="setStatus(${c.id},'拒绝')" style="margin-left:6px">拒绝</button>`;
       }
-      return user;
     }
+    return `<tr>
+      <td>${c.id}</td>
+      <td>${esc(c.submitter_name)}</td>
+      <td>${Number(c.amount).toFixed(2)}</td>
+      <td>${esc(c.purpose)}</td>
+      <td>${esc(c.bank_name)}</td>
+      <td>${esc(c.account_no)}</td>
+      <td><span class="badge ${badgeClass(c.status)}">${esc(c.status)}</span></td>
+      <td>${new Date(c.created_at).toLocaleString()}</td>
+      <td>${thumbs}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join('');
+}
 
-    async function checkLoginAndRole() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert("请先登录！");
-        window.location.href = "/login.html";
-        return;
-      }
-      currentUser = session.user;
-      await ensureProfile();
+async function setStatus(id, next){
+  const payload={status:next};
+  if (next==='审核中') payload.reviewed_at=new Date().toISOString();
+  if (next==='已完成')  payload.completed_at=new Date().toISOString();
+  const { error } = await supabase.from('claims').update(payload).eq('id', id);
+  if (error){ alert('更新失败：'+error.message); return; }
+  loadClaims({kw:document.getElementById('kw').value.trim(), st:document.getElementById('st').value});
+}
 
-      document.getElementById('who').textContent = currentUser.email;
+async function logout(){ await supabase.auth.signOut(); location.href='/login.html'; }
 
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('role, full_name')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+/* ===== 搜索事件 ===== */
+document.getElementById('btnSearch').addEventListener('click', ()=>{
+  loadClaims({kw:document.getElementById('kw').value.trim(), st:document.getElementById('st').value});
+});
+document.getElementById('btnClear').addEventListener('click', ()=>{
+  document.getElementById('kw').value=''; document.getElementById('st').value='';
+  loadClaims({});
+});
 
-      isAdmin = prof?.role === 'admin';
-      if (isAdmin) document.getElementById('thActions').style.display = '';
-    }
+/* ===== 新增进账（保留、极简） ===== */
+function openIncomeModal(){ document.getElementById('incomeModal').style.display='flex'; document.getElementById('inDate').value = new Date().toISOString().slice(0,10); document.getElementById('incomeMsg').textContent=''; }
+function closeIncomeModal(){ document.getElementById('incomeModal').style.display='none'; }
+async function saveIncome(){
+  const amount=parseFloat(document.getElementById('inAmount').value);
+  const note=document.getElementById('inNote').value.trim();
+  const date=document.getElementById('inDate').value;
+  const msg=document.getElementById('incomeMsg');
+  if(!amount){ msg.textContent='请填写金额'; return; }
+  const { error } = await supabase.from('transactions').insert({ kind:'in', amount, note, occurred_at: date? new Date(date): new Date() });
+  if (error){ msg.textContent='保存失败：'+error.message; return; }
+  msg.textContent='保存成功'; setTimeout(()=>{ closeIncomeModal(); }, 600);
+}
 
-    async function loadClaims() {
-      const { data, error } = await supabase
-        .from("claims")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) { alert("读取数据失败"); return; }
-
-      const tbody = document.getElementById("claimsBody");
-      tbody.innerHTML = "";
-      data.forEach(row => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${row.id}</td>
-          <td>${row.submitter_name || ''}</td>
-          <td>${row.amount?.toFixed(2)}</td>
-          <td>${row.purpose || ''}</td>
-          <td>${row.bank_name || ''}</td>
-          <td>${row.account_no || ''}</td>
-          <td><span class="status status-${row.status}">${row.status}</span></td>
-          <td>${new Date(row.created_at).toLocaleString()}</td>
-          <td>${isAdmin ? renderActions(row) : ''}</td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function renderActions(row) {
-      if (row.status === '审核中') {
-        return `
-          <button class="btn btn-green" onclick="setStatus(${row.id}, '已完成')">✅ 通过</button>
-          <button class="btn btn-red" onclick="setStatus(${row.id}, '拒绝')">❌ 拒绝</button>
-        `;
-      }
-      return '';
-    }
-
-    async function setStatus(id, next) {
-      const payload = { status: next };
-      if (next === '审核中') payload.reviewed_at = new Date().toISOString();
-      if (next === '已完成') payload.completed_at = new Date().toISOString();
-      const { error } = await supabase.from('claims').update(payload).eq('id', id);
-      if (error) alert('更新失败: ' + error.message);
-      else loadClaims();
-    }
-
-    async function logout() {
-      await supabase.auth.signOut();
-      window.location.href = '/login.html';
-    }
-
-    (async function init() {
-      await checkLoginAndRole();
-      await loadClaims();
-    })();
-  </script>
+/* ===== 初始化 ===== */
+(async function init(){
+  await checkLoginAndRole();
+  await loadClaims();
+})();
+</script>
 </body>
 </html>
