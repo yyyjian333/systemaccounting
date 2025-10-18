@@ -25,15 +25,23 @@
       width:100%; max-width:410px; background:var(--surface); border:1px solid var(--border);
       border-radius:var(--radius); box-shadow:var(--shadow); padding:28px 26px;
     }
-    .brand{
-      display:flex; align-items:center; gap:12px; margin-bottom:14px;
+    .brand{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+
+    /* ✅ 新增：品牌 Logo 图片样式 */
+    .brand-logo{
+      width:42px; height:42px; border-radius:10px; object-fit:contain;
+      background:#fff; /* 你的 logo 若无底色，这个白底能让它更清晰；不需要可删 */
+      box-shadow:0 6px 18px rgba(212,160,22,.15);
     }
+
+    /* 原来的文字 Logo（作为图片加载失败的回退） */
     .logo{
       width:42px; height:42px; border-radius:10px;
       background: linear-gradient(135deg, var(--primary) 0%, #f2c64b 100%);
       display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800;
       box-shadow: 0 6px 18px rgba(212,160,22,.35);
     }
+
     h1{font-size:20px; margin:0}
     .sub{font-size:13px; color:var(--muted); margin:4px 0 18px}
 
@@ -71,7 +79,11 @@
 <body>
   <div class="card">
     <div class="brand">
-      <div class="logo">RM</div>
+      <!-- ✅ 用你的图片；失败时自动显示右边的 “RM” 回退 -->
+      <img id="brandLogo" class="brand-logo" src="/logo.png" alt="RM GROUP Logo"
+           onerror="this.style.display='none'; document.getElementById('brandFallback').style.display='flex'">
+      <div id="brandFallback" class="logo" style="display:none">RM</div>
+
       <div>
         <h1>RM 记账系统</h1>
         <div class="sub">请登录以继续</div>
@@ -101,16 +113,14 @@
   </div>
 
   <script>
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";       // ← 换成你的
+    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";       // ← 你的
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 若已登录，直接回首页
+    // 已登录则直接回首页
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        location.href = "/index.html";
-      }
+      if (session) location.href = "/index.html";
     })();
 
     const $ = (id) => document.getElementById(id);
@@ -139,7 +149,7 @@
       setTimeout(() => location.href = "/index.html", 400);
     }
 
-    // 发重置邮件
+    // 发送重置密码邮件
     $("linkReset").addEventListener("click", async (e) => {
       e.preventDefault();
       const email = $("email").value.trim();
