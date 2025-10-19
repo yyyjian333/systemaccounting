@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>新增进账 · RM 记账系统</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{
+      --bg:#fbf7ee; --surface:#ffffff; --text:#1f2937; --muted:#6b7280; --border:#e5e7eb;
+      --primary:#d4a016; --primary-600:#b4840e; --info:#1f5fa3;
+      --radius:14px; --shadow:0 12px 30px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      background:var(--bg); margin:0; font-family:Inter,system-ui; color:var(--text);
+      display:flex; justify-content:center; padding:40px;
+    }
+    .card{
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:28px 30px; width:100%; max-width:600px;
+    }
+    h2{margin-top:0; color:var(--info);}
+    label{display:block; margin-top:15px; font-weight:600;}
+    input, select, textarea{
+      width:100%; padding:10px; font-size:15px;
+      border:1px solid var(--border); border-radius:10px;
+    }
+    button{
+      margin-top:24px; background:var(--info); color:#fff;
+      border:0; padding:12px 16px; font-size:16px;
+      border-radius:10px; cursor:pointer;
+    }
+    button:hover{filter:brightness(1.05);}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>💰 新增进账</h2>
+
+    <label>入账账户 *</label>
+    <select id="account">
+      <option value="">加载中...</option>
+    </select>
+
+    <label>金额 (MYR) *</label>
+    <input id="amount" type="number" placeholder="例如 120.00" step="0.01">
+
+    <label>说明 *</label>
+    <textarea id="note" rows="3" placeholder="收入来源说明..."></textarea>
+
+    <button id="btnSave">保存进账</button>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function loadAccounts() {
+      const sel = document.getElementById('account');
+      sel.innerHTML = '<option>加载中...</option>';
+      const { data, error } = await supabase.from('accounts').select('id,name').order('name');
+      if (error) { sel.innerHTML = '<option>加载失败</option>'; console.error(error); return; }
+      if (!data || !data.length) { sel.innerHTML = '<option>暂无账户，请先在数据库添加</option>'; return; }
+      sel.innerHTML = data.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+    }
+
+    async function saveIncome(){
+      const accountId = Number(document.getElementById('account').value);
+      const amount = Number(document.getElementById('amount').value);
+      const note = document.getElementById('note').value.trim();
+      if (!accountId) return alert('请选择账户');
+      if (!amount) return alert('请输入金额');
+
+      const payload = {
+        kind: 'in',
+        amount,
+        note,
+        occurred_at: new Date().toISOString(),
+        account_id: accountId
+      };
+
+      const { error } = await supabase.from('transactions').insert(payload);
+      if (error) { alert('保存失败：' + error.message); return; }
+
+      alert('✅ 已保存进账');
+      location.href = '/index.html';
+    }
+
+    document.getElementById('btnSave').addEventListener('click', saveIncome);
+    window.addEventListener('DOMContentLoaded', loadAccounts);
+  </script>
+</body>
+</html>
