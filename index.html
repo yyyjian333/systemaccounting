@@ -150,7 +150,9 @@
       <thead>
         <tr>
           <th>ID</th><th>提交人</th><th>金额</th><th>用途</th>
-          <th>银行</th><th>账户</th><th>状态</th><th>创建时间</th><th>收据</th>
+          <th>银行</th><th>账户</th>
+          <th id="thPayoutAccount" style="display:none">出款账户</th>
+          <th>状态</th><th>创建时间</th><th>收据</th>
           <th id="thActions" style="display:none">操作</th>
         </tr>
       </thead>
@@ -186,7 +188,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let isAdmin = false;
 let currentUser = null;
 
-  /* ===== 自动建档：首次登录自动在 profiles 写入一行 ===== */
+/* ===== 自动建档：首次登录自动在 profiles 写入一行 ===== */
 async function ensureProfile() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
@@ -218,12 +220,30 @@ async function checkLoginAndRole() {
     .maybeSingle();
 
   isAdmin = prof?.role === 'admin';
-  if (isAdmin) document.getElementById('thActions').style.display = '';
+  if (isAdmin) {
+    document.getElementById('thActions').style.display = '';
+    document.getElementById('thPayoutAccount').style.display = '';
+  }
 }
 
 async function logout(){
   await supabase.auth.signOut();
   window.location.href = "/login.html";
+}
+
+/* —— 账户列表缓存 —— */
+let ACCOUNTS = [];
+async function loadAccountsList(){
+  const { data, error } = await supabase.from('accounts').select('id,name').order('name');
+  if (error) { console.error('读取账户失败：', error); ACCOUNTS = []; return; }
+  ACCOUNTS = data || [];
+}
+function renderAccountOptions(selectedId){
+  if (!ACCOUNTS.length) return '<option value="">（无账户）</option>';
+  return '<option value="">请选择账户</option>' +
+    ACCOUNTS.map(a =>
+      `<option value="${a.id}" ${Number(selectedId)===Number(a.id)?'selected':''}>${a.name}</option>`
+    ).join('');
 }
 
 /* 状态徽章颜色 */
@@ -247,7 +267,7 @@ async function loadClaims({ kw = '', st = '' } = {}){
   empty.style.display = 'none';
 
   let q = supabase.from('claims')
-    .select('id, submitter_name, amount, purpose, bank_name, account_no, status, created_at, reviewed_at, completed_at')
+    .select('id, submitter_name, amount, purpose, bank_name, account_no, account_id, status, created_at, reviewed_at, completed_at')
     .order('created_at', { ascending: false });
 
   if (kw) {
@@ -279,6 +299,16 @@ async function loadClaims({ kw = '', st = '' } = {}){
          ${list.length>3?`<span class="muted">+${list.length-3} 更多…</span>`:''}</div>`
       : `<span class="muted">无</span>`;
 
+    // 出款账户（仅管理员可操作）
+    const payoutCell = isAdmin
+      ? `<select class="acctSel" data-claim-id="${c.id}"
+            onchange="setClaimAccount(${c.id}, this.value)"
+            ${c.status==='已完成' ? 'disabled' : ''}
+            style="width: 180px; padding:6px 8px; border:1px solid var(--border); border-radius:8px;">
+           ${renderAccountOptions(c.account_id)}
+         </select>`
+      : `<span class="muted">—</span>`;
+
     // 管理员操作按钮
     let actions = '';
     if (isAdmin) {
@@ -298,10 +328,11 @@ async function loadClaims({ kw = '', st = '' } = {}){
       <td>${esc(c.purpose)}</td>
       <td>${esc(c.bank_name)}</td>
       <td>${esc(c.account_no)}</td>
+      <td ${isAdmin ? '' : 'style="display:none"'}>${payoutCell}</td>
       <td><span class="badge ${statusClass(c.status)}">${esc(c.status)}</span></td>
       <td>${new Date(c.created_at).toLocaleString()}</td>
       <td>${thumbs}</td>
-      <td>${actions}</td>
+      <td ${isAdmin ? '' : 'style="display:none"'}>${actions}</td>
     </tr>`;
   }).join('');
 }
@@ -312,8 +343,29 @@ function renderThumb(url){
   return `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="receipt" /></a>`;
 }
 
+/* 设置报销的出款账户（写入 claims.account_id） */
+async function setClaimAccount(claimId, accountId){
+  accountId = Number(accountId) || null;
+  const { error } = await supabase.from('claims').update({ account_id: accountId }).eq('id', claimId);
+  if (error) {
+    alert('设置出款账户失败：' + error.message);
+    console.error(error);
+  }
+}
+
 /* 审批状态更新（admin 权限） */
 async function setStatus(id, next){
+  // 如果要设为“已完成”，必须先选择出款账户
+  if (next === '已完成') {
+    const sel = document.querySelector(`select.acctSel[data-claim-id="${id}"]`);
+    const accountId = sel ? Number(sel.value) : 0;
+    if (!accountId) {
+      alert('请先在「出款账户」里选择一个公司账户，再标记为已完成。');
+      if (sel) sel.focus();
+      return;
+    }
+  }
+
   const payload = { status: next };
   if (next === '审核中') payload.reviewed_at = new Date().toISOString();
   if (next === '已完成')  payload.completed_at = new Date().toISOString();
@@ -364,7 +416,8 @@ document.getElementById('btnClear').addEventListener('click', () => {
 /* 页面初始化 */
 (async function init(){
   await checkLoginAndRole();
-  await loadClaims();
+  await loadAccountsList();     // 先把公司账户读出来（给下拉用）
+  await loadClaims();           // 再渲染列表
 })();
 </script>
 </body>
