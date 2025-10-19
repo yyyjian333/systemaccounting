@@ -26,6 +26,24 @@
     .kpi div{font-size:22px;font-weight:700}
     canvas{width:100%;height:340px;max-height:340px}
     .muted{color:#6b7280}
+
+    /* 🏦 账户余额样式 */
+    .balances-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+      gap:12px;
+      margin-top:10px;
+    }
+    .balance-card{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:14px;
+      box-shadow:var(--shadow);
+    }
+    .balance-name{font-weight:700;margin-bottom:4px}
+    .balance-amt{font-size:18px;color:var(--info);font-weight:700}
+    .balance-sub{font-size:12px;color:var(--muted)}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
@@ -53,6 +71,13 @@
     <div class="kpi"><h3>本年 · 进账</h3><div id="yrIn">-</div></div>
     <div class="kpi"><h3>本年 · 出账</h3><div id="yrOut">-</div></div>
     <div class="kpi"><h3>本年 · 结余</h3><div id="yrNet">-</div></div>
+  </div>
+
+  <!-- 🏦 新增：账户余额模块 -->
+  <div class="card">
+    <h3>🏦 各账户余额</h3>
+    <div id="balancesWrap" class="balances-grid">加载中...</div>
+    <div id="balancesTotal" style="margin-top:8px;font-weight:600;"></div>
   </div>
 
   <div class="card">
@@ -112,7 +137,7 @@ function bucketYear(entries){
   const mp=new Map(); entries.forEach(e=>{const y=new Date(e.date).getFullYear(); if(!mp.has(y)) mp.set(y,{in:0,out:0}); const o=mp.get(y); if(e.kind==='in')o.in+=e.amount; else if(e.kind==='out')o.out+=e.amount; });
   const ys=Array.from(mp.keys()).sort((a,b)=>a-b); return{labels:ys.map(String),inVals:ys.map(y=>mp.get(y).in),outVals:ys.map(y=>mp.get(y).out)};
 }
-function draw(id,labels,a,b){return new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{label:'进账',data:a},{label:'出账',data:b}]},options:{responsive:true,maintainAspectRatio:false}});}
+function draw(id,labels,a,b){return new Chart(document.getElementById(id),{type:'bar',data:{labels,datasets:[{label:'进账',data:a,backgroundColor:'#1f5fa3'},{label:'出账',data:b,backgroundColor:'#d4a016'}]},options:{responsive:true,maintainAspectRatio:false}});}
 
 function fillKPI(entries){
   const now=new Date(); const w0=startOfWeek(now), m0=startOfMonth(now), y0=startOfYear(now);
@@ -125,8 +150,28 @@ function fillKPI(entries){
   const yrIn=fil(Y,'in'),yrOut=fil(Y,'out'); document.getElementById('yrIn').textContent=fmt(yrIn); document.getElementById('yrOut').textContent=fmt(yrOut); document.getElementById('yrNet').textContent=fmt(yrIn-yrOut);
 }
 
+/* 🏦 载入账户余额 */
+async function loadBalances(){
+  const grid=document.getElementById('balancesWrap');
+  const total=document.getElementById('balancesTotal');
+  grid.innerHTML='加载中…';
+  const {data,error}=await supabase.from('accounts').select('id,name,balance').order('name');
+  if(error){grid.textContent='读取失败：'+error.message;return;}
+  if(!data||!data.length){grid.textContent='暂无账户';return;}
+  grid.innerHTML=data.map(a=>`
+    <div class="balance-card">
+      <div class="balance-name">${a.name}</div>
+      <div class="balance-amt">RM ${(Number(a.balance)||0).toFixed(2)}</div>
+      <div class="balance-sub">更新于 ${new Date().toLocaleString()}</div>
+    </div>`).join('');
+  const sumAll=data.reduce((s,a)=>s+Number(a.balance||0),0);
+  total.innerHTML=`合计余额：<strong style="color:var(--info)">RM ${sumAll.toFixed(2)}</strong>`;
+}
+
+/* 初始化 */
 (async function(){
   await checkLogin();
+  await loadBalances();
   const entries=await fetchEntries();
   fillKPI(entries);
   const w=bucketWeek(entries); draw('chartWeek', w.labels, w.inVals, w.outVals);
