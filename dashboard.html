@@ -80,6 +80,21 @@
     <div id="balancesTotal" style="margin-top:8px;font-weight:600;"></div>
   </div>
 
+    <!-- 弹出框 -->
+  <div id="accountModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);align-items:center;justify-content:center;">
+    <div style="background:#fff;padding:20px;border-radius:12px;min-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.2);">
+      <h3 style="margin-top:0">新增户口</h3>
+      <label style="font-size:13px">账户名称：</label>
+      <input id="newAccName" type="text" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+      <label style="font-size:13px;margin-top:8px;display:block;">初始余额：</label>
+      <input id="newAccBalance" type="number" step="0.01" placeholder="0.00" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:14px">
+      <div style="margin-top:14px;text-align:right">
+        <button class="btn btn-ghost" onclick="closeAddAccount()">取消</button>
+        <button class="btn btn-info" onclick="saveNewAccount()">保存</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h3>近 12 周</h3>
     <canvas id="chartWeek"></canvas>
