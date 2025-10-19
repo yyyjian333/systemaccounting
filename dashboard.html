@@ -131,13 +131,42 @@ async function checkLogin(){ const {data:{session}}=await supabase.auth.getSessi
 async function logout(){ await supabase.auth.signOut(); location.href='/login.html'; }
 
 async function fetchEntries(){
-  const now=new Date(); const since=new Date(now); since.setFullYear(now.getFullYear()-3);
-  const {data:tx}=await supabase.from('transactions').select('kind,amount,occurred_at').gte('occurred_at',since.toISOString());
-  const {data:claims}=await supabase.from('claims').select('amount,status,created_at,completed_at').gte('created_at',since.toISOString());
+  const now = new Date();
+  const since = new Date(now);
+  since.setFullYear(now.getFullYear() - 3);
 
-  const entries=[];
-  (tx||[]).forEach(t=>{if(!t||!t.kind)return;entries.push({kind:t.kind,amount:Number(t.amount||0),date:t.occurred_at||new Date().toISOString()});});
-  (claims||[]).forEach(c=>{if(c.status==='已完成'){entries.push({kind:'out',amount:Number(c.amount||0),date:c.completed_at||c.created_at});}});
+  // ✅ 只取进账 transactions(kind='in')
+  const { data: tx, error: eTx } = await supabase
+    .from('transactions')
+    .select('kind, amount, occurred_at')
+    .eq('kind', 'in')
+    .gte('occurred_at', since.toISOString());
+  if (eTx) console.error(eTx);
+
+  // ✅ 出账只来自“已完成”的报销（claims）
+  const { data: claims, error: eCl } = await supabase
+    .from('claims')
+    .select('amount, status, created_at, completed_at')
+    .eq('status', '已完成')
+    .gte('created_at', since.toISOString());
+  if (eCl) console.error(eCl);
+
+  const entries = [];
+  (tx || []).forEach(t => {
+    entries.push({
+      kind: 'in',
+      amount: Number(t.amount || 0),
+      date: t.occurred_at || new Date().toISOString()
+    });
+  });
+  (claims || []).forEach(c => {
+    entries.push({
+      kind: 'out',
+      amount: Number(c.amount || 0),
+      date: c.completed_at || c.created_at
+    });
+  });
+
   return entries;
 }
 
