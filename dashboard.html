@@ -75,10 +75,15 @@
 
   <!-- 🏦 新增：账户余额模块 -->
   <div class="card">
+   <div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
     <h3>🏦 各账户余额</h3>
-    <div id="balancesWrap" class="balances-grid">加载中...</div>
-    <div id="balancesTotal" style="margin-top:8px;font-weight:600;"></div>
+    <button class="btn btn-info" style="padding:6px 12px;font-size:13px" onclick="openAddAccount()">＋ 新增户口</button>
   </div>
+
+  <div id="balancesWrap" class="balances-grid">加载中...</div>
+  <div id="balancesTotal" style="margin-top:8px;font-weight:600;"></div>
+</div>
 
     <!-- 弹出框 -->
   <div id="accountModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);align-items:center;justify-content:center;">
