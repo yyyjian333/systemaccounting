@@ -182,6 +182,31 @@ async function loadBalances(){
   const sumAll=data.reduce((s,a)=>s+Number(a.balance||0),0);
   total.innerHTML=`合计余额：<strong style="color:var(--info)">RM ${sumAll.toFixed(2)}</strong>`;
 }
+  
+// 打开新增户口弹窗
+function openAddAccount(){
+  document.getElementById('accountModal').style.display='flex';
+  document.getElementById('newAccName').focus();
+}
+// 关闭
+function closeAddAccount(){
+  document.getElementById('accountModal').style.display='none';
+  document.getElementById('newAccName').value='';
+  document.getElementById('newAccBalance').value='';
+}
+// 保存新账户
+async function saveNewAccount(){
+  const name = document.getElementById('newAccName').value.trim();
+  const balance = parseFloat(document.getElementById('newAccBalance').value||0);
+  if(!name){ alert('请输入账户名称'); return; }
+
+  const { error } = await supabase.from('accounts').insert({ name, balance });
+  if(error){ alert('保存失败：'+error.message); return; }
+
+  alert('✅ 新户口已添加');
+  closeAddAccount();
+  loadBalances();
+}
 
 /* 初始化 */
 (async function(){
