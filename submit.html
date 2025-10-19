@@ -153,23 +153,44 @@ async function submitClaim(){
 
   if(e1){ setMsg("创建报销失败："+e1.message); console.error(e1); return; }
 
-  // 2️⃣ 上传收据文件
-  if(files && files.length){
-    for(const f of files){
-      const filename = `${Date.now()}_${encodeURIComponent(f.name)}`;
-      const path = `receipts/${claim.id}/${filename}`;
-      const { error: eUp } = await supabase.storage.from('receipts').upload(path, f, { upsert:false });
-      if(eUp){ setMsg("上传失败："+eUp.message); console.error(eUp); return; }
+  /// 2) 上传多张收据 + 写入 attachments
+if (files && files.length) {
+  for (const f of files) {
+    // 生成“安全文件名”：只保留字母数字、下划线、横杠和点；空格等都变成 _
+    const safeName = f.name
+      .normalize('NFKD')            // 规范化避免特殊组合字符
+      .replace(/[^\w.\-]+/g, '_');  // 非字母数字 . _ - 的都转成下划线
 
-      const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(path);
-      const { error: eAtt } = await supabase.from('attachments').insert({
-        claim_id: claim.id,
-        file_url: publicUrl,
-        type:'receipt'
-      });
-      if(eAtt){ setMsg("保存收据记录失败："+eAtt.message); console.error(eAtt); return; }
+    const filename = `${Date.now()}_${safeName}`;
+    const path = `receipts/${claim.id}/${filename}`;
+
+    // 上传（加上 contentType）
+    const { error: eUp } = await supabase
+      .storage
+      .from('receipts')
+      .upload(path, f, { upsert: false, contentType: f.type });
+
+    if (eUp) {
+      // 如果某个文件失败，不要写入 attachments 记录
+      console.error('上传失败', eUp, '文件=', f.name);
+      setMsg("上传失败：" + eUp.message);
+      continue;
+    }
+
+    // 如果 receipts bucket 是 Public，用 publicUrl；不是 Public 就用签名 URL
+    const { data: { publicUrl } } = supabase.storage.from('receipts').getPublicUrl(path);
+
+    const { error: eAtt } = await supabase
+      .from('attachments')
+      .insert({ claim_id: claim.id, file_url: publicUrl, type: 'receipt' });
+
+    if (eAtt) {
+      console.error('写入附件记录失败', eAtt);
+      setMsg("保存收据记录失败：" + eAtt.message);
+      continue;
     }
   }
+}
 
   // 3️⃣ 完成提示
   setMsg("提交成功！即将返回列表…", true);
