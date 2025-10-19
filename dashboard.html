@@ -99,6 +99,19 @@
       </div>
     </div>
   </div>
+// 删除账户
+async function deleteAccount(id, name){
+  if(!confirm(`确定要删除户口「${name}」吗？\n此操作不可恢复。`)) return;
+
+  const { error } = await supabase.from('accounts').delete().eq('id', id);
+  if(error){
+    alert('删除失败：' + error.message);
+    return;
+  }
+
+  alert('✅ 已删除');
+  loadBalances();
+}
 
   <div class="card">
     <h3>近 12 周</h3>
