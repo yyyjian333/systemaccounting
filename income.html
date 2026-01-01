@@ -57,7 +57,7 @@
   <script>
     const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     async function loadAccounts() {
       const sel = document.getElementById('account');
