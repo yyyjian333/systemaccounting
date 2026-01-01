@@ -27,14 +27,14 @@
     }
     .brand{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
 
-    /* ✅ 新增：品牌 Logo 图片样式 */
+   
     .brand-logo{
       width:42px; height:42px; border-radius:10px; object-fit:contain;
-      background:#fff; /* 你的 logo 若无底色，这个白底能让它更清晰；不需要可删 */
+      background:#fff; 
       box-shadow:0 6px 18px rgba(212,160,22,.15);
     }
 
-    /* 原来的文字 Logo（作为图片加载失败的回退） */
+ 
     .logo{
       width:42px; height:42px; border-radius:10px;
       background: linear-gradient(135deg, var(--primary) 0%, #f2c64b 100%);
@@ -79,7 +79,7 @@
 <body>
   <div class="card">
     <div class="brand">
-      <!-- ✅ 用你的图片；失败时自动显示右边的 “RM” 回退 -->
+    
       <img id="brandLogo" class="brand-logo" src="/logo.png" alt="RM GROUP Logo"
            onerror="this.style.display='none'; document.getElementById('brandFallback').style.display='flex'">
       <div id="brandFallback" class="logo" style="display:none">RM</div>
@@ -109,16 +109,57 @@
     </div>
 
     <div id="msg" class="msg"></div>
+  </div>
+
+
+  <div class="card" id="resetCard" style="display:none">
+    <div class="brand">
+      <img class="brand-logo" src="/logo.png" alt="RM GROUP Logo"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+      <div class="logo" style="display:none">RM</div>
+      <div>
+        <h1>设置新密码</h1>
+        <div class="sub">请输入您的新密码</div>
+      </div>
+    </div>
+
+    <label for="newPassword">新密码</label>
+    <div class="input-wrap">
+      <input id="newPassword" type="password" placeholder="请输入新密码（至少6位）" autocomplete="new-password" />
+      <span id="toggleNew" class="toggle">显示</span>
+    </div>
+
+    <label for="confirmPassword">确认密码</label>
+    <div class="input-wrap">
+      <input id="confirmPassword" type="password" placeholder="再次输入新密码" autocomplete="new-password" />
+    </div>
+
+    <button class="btn" id="btnSavePassword">保存新密码</button>
+
+    <div id="resetMsg" class="msg"></div>
     <div class="foot">© RM GROUP</div>
   </div>
 
   <script>
-    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";       // ← 你的
+    const SUPABASE_URL = "https://jdzytjocdkuzjtuwygdl.supabase.co";      
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impkenl0am9jZGt1emp0dXd5Z2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA2MjA2MjgsImV4cCI6MjA3NjE5NjYyOH0.jP-CwOVxYhfHXGOz_l_Q7Xc-umLIcJQH0_LJZSUAxNw";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 已登录则直接回首页
+
+    let isRecoveryMode = false;
+
     (async () => {
+   
+      const hash = window.location.hash;
+      if (hash && hash.includes('type=recovery')) {
+        isRecoveryMode = true;
+       
+        document.querySelector('.card').style.display = 'none';
+        $("resetCard").style.display = 'block';
+        return;
+      }
+
+     
       const { data: { session } } = await supabase.auth.getSession();
       if (session) location.href = "/index.html";
     })();
@@ -149,7 +190,7 @@
       setTimeout(() => location.href = "/index.html", 400);
     }
 
-    // 发送重置密码邮件
+
     $("linkReset").addEventListener("click", async (e) => {
       e.preventDefault();
       const email = $("email").value.trim();
